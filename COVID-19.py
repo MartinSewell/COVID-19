@@ -1,7 +1,7 @@
 # The Efficacy of Lockdowns and Face Masks Vis-à-Vis Mitigating COVID-19
 # Martin Sewell
 # martin.sewell@cantab.net
-# 25 July 2021
+# 15 February 2022
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -16,6 +16,8 @@ from numpy import genfromtxt
 # UK United Kingdom
 # SE Sweden
 # EN England
+# HU Hungary
+# RO Romania
 # IFR infection fatality rate
 
 # Constants
@@ -26,9 +28,11 @@ IFR = 0.51/100    # Oke and Heneghan (2021) https://www.cebm.net/covid-19/global
 gamma = 1/9       # Van Beusekom (2020) https://www.cidrap.umn.edu/news-perspective/2020/11/covid-19-most-contagious-first-5-days-illness-study-finds
 
 # Data sources:
-# UK: https://coronavirus.data.gov.uk/details/deaths
-# Sweden: https://fohm.maps.arcgis.com/sharing/rest/content/items/b5e7488e117749c19881cce45db13f7e/data Antal avlidna per dag
-# England: https://coronavirus.data.gov.uk/details/deaths?areaType=nation&areaName=England
+# UK COVID-19 deaths: https://coronavirus.data.gov.uk/details/deaths
+# Sweden COVID-19 deaths: https://fohm.maps.arcgis.com/sharing/rest/content/items/b5e7488e117749c19881cce45db13f7e/data Antal avlidna per dag
+# England COVID-19 deaths: https://coronavirus.data.gov.uk/details/deaths?areaType=nation&areaName=England
+# Vaccinations: https://ourworldindata.org/grapher/covid-vaccination-doses-per-capita
+# Excess mortality: https://ourworldindata.org/grapher/excess-mortality-p-scores-average-baseline-by-age
 
 # Enable LaTeX maths symbols in figures
 plt.rc('text', usetex = True)
@@ -816,7 +820,6 @@ legend = ax15.legend()
 legend.get_frame().set_alpha(1)
 for spine in ('top', 'right', 'bottom', 'left'):
     ax15.spines[spine].set_visible(False)
-fig15.savefig("fig4.pdf") # fourth figure in paper
 ax15.set_title(r'$\od{\beta}{\frac{S}{N}}$ as the UK transitioned into its first lockdown')
 fig15.savefig("fig15.png")
 
@@ -908,6 +911,48 @@ for spine in ('top', 'right', 'bottom', 'left'):
 fig18.savefig("fig5.pdf") # fifth figure in paper
 ax18.set_title('The effect of making masks mandatory in enclosed public places in England')
 fig18.savefig("fig18.png")
+
+
+################
+# Vaccinations #
+################
+
+# Vaccinations and excess mortality for Hungary and Romania
+# The excess mortality data was converted from weekly to daily using barycentric rational interpolation from the Boost C++ Libraries.
+# The end point was chosen to avoid including what looks like anomalous vaccination data for Hungary.
+data = genfromtxt('HungaryRomania.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in data]
+vax_HU = [row[1] for row in data]
+vax_RO = [row[2] for row in data]
+deaths_HU = [row[3] for row in data]
+deaths_RO = [row[4] for row in data]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20=ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+Hv = ax19.plot(dates, vax_HU, alpha=0.5, lw=2, label='Hungary vaccinations')
+Rv = ax19.plot(dates, vax_RO, alpha=0.5, lw=2, label='Romania vaccinations')
+Hem = ax20.plot(dates, deaths_HU, alpha=0.5, lw=2, label='Hungary excess mortality')
+Rem = ax20.plot(dates, deaths_RO, alpha=0.5, lw=2, label='Romania excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Excess mortality P-scores')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.DayLocator(interval=7*8))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(b=True)
+lns = Hv+Rv+Hem+Rem
+labs = [l.get_label() for l in lns]
+legend = ax19.legend(lns, labs)
+legend.get_frame().set_alpha(1)
+for spine in ('top', 'right', 'bottom', 'left'):
+    ax19.spines[spine].set_visible(False)
+    ax20.spines[spine].set_visible(False)
+fig19.savefig("fig6.pdf") # sixth figure in paper
+ax19.set_title('Vaccinations and excess mortality for Hungary and Romania')
+fig19.savefig("fig19.png")
 
 
 ###############
