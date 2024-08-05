@@ -1,19 +1,17 @@
 // The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 // Martin Sewell
 // martin.sewell@cantab.net
-// 22 July 2024
+// 5 August 2024
 
-// OWID_TRS NOT FOUND, after w
-
-// INPUT FILES:
-// Info on data: [do not need this]
+// INPUT FILES: [all downloaded on 1 August 2024]
+// Info on data: [For information only, do not need this.]
 // https://covid.ourworldindata.org/data/owid-covid-codebook.csv
 
 // Lockdowns
 // https://ourworldindata.org/covid-stringency-index
 // owid-covid-data.csv [column 47 (where first col is 0)]
 // stringency_index
-// https://github.com/owid/covid-19-data/blob/master/public/data/owid-covid-data.csv
+// https://github.com/owid/covid-19-data/blob/master/public/data/owid-covid-data.csv [direct download from here]
 
 // Facemasks
 // https://ourworldindata.org/grapher/face-covering-policies-covid
@@ -3426,10 +3424,7 @@ int main()
 					dd = d - firstdate;
 					dateint = dd.days();
 					if (!fields[1].empty() && !fields[3].empty() && (dateint < numdates)) {
-						//std::cout << fields[1] << " " << dateint << " " << fields[3] << " " << CountryIndex(code, fields[1]) << std::endl;
 						vaccinations[CountryIndex(code, fields[1])][dateint] = stod(fields[3]);
-
-
 					}
 				}
 				catch (const std::exception& e) {
@@ -3629,7 +3624,7 @@ int main()
 
 	std::cout << std::endl;
 	std::cout << "1) Copy this program's output files to the Python code directory." << std::endl;
-	std::cout << "2) Run the Python code (ignore missing file errors)." << std::endl;
+	std::cout << "2) Run the Python code (ignore errors)." << std::endl;
 	std::cout << "3) Copy clusters.txt from the Python directory to the C++ directory." << std::endl;
 	std::cout << "4) ";
 	system("pause");
@@ -5689,7 +5684,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// FaeroeIslands vs Norway CD
 	ci1 = CountryIndex(code, "FRO");
 	ci2 = CountryIndex(code, "NOR");
@@ -5734,7 +5728,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// French Polynesia vs New Zealand
 	ci1 = CountryIndex(code, "PYF");
 	ci2 = CountryIndex(code, "NZL");
@@ -5756,7 +5749,6 @@ int main()
 		FrenchPolynesiaNewZealandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Gibraltar vs India
 	ci1 = CountryIndex(code, "GIB");
@@ -5846,7 +5838,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Hong Kong vs Philippines
 	ci1 = CountryIndex(code, "HKG");
 	ci2 = CountryIndex(code, "PHL");
@@ -5868,8 +5859,6 @@ int main()
 		HongKongPhilippinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
-
 
 	// Hong Kong vs South Korea
 	ci1 = CountryIndex(code, "HKG");
@@ -5937,7 +5926,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Indonesia vs Philippines
 	ci1 = CountryIndex(code, "IDN");
 	ci2 = CountryIndex(code, "PHL");
@@ -6003,7 +5991,6 @@ int main()
 		IraqOmanfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Jamaica vs Saint Vincent and the Grenadines CD
 	ci1 = CountryIndex(code, "JAM");
@@ -6115,7 +6102,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Kyrgyzstan vs Uzbekistan CD
 	ci1 = CountryIndex(code, "KGZ");
 	ci2 = CountryIndex(code, "UZB");
@@ -6226,7 +6212,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Malaysia vs Mongolia
 	ci1 = CountryIndex(code, "MYS");
 	ci2 = CountryIndex(code, "MNG");
@@ -6292,7 +6277,6 @@ int main()
 		MalaysiaThailandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Malaysia vs Thailand
 	ci1 = CountryIndex(code, "MYS");
