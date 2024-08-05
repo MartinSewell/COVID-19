@@ -14,7 +14,6 @@ import statistics
 from numpy import genfromtxt
 from sklearn.cluster import KMeans
 
-
 # Abbreviations:
 # UK United Kingdom
 # SE Sweden
@@ -52,47 +51,6 @@ def smooth(data, window_size):
 
 # output file
 f = open("output.txt","w", encoding='ascii')
-
-
-
-
-######################
-# K-MEANS CLUSTERING #
-######################
-
-
-def smooth28(data):
-    window = np.ones(int(28))/float(28)
-    return np.convolve(data, window, mode='same')
-
-c = open("clusters.txt","w", encoding='ascii')
-
-Xcd = genfromtxt('clusteringcd.txt', delimiter='\t')
-Xcd[np.isnan(Xcd)] = 0
-Xcd = np.apply_along_axis(smooth28, 1, Xcd)
-for num_clusters in range(2,21): # 2 to 20 inclusive (19 lines)
-    modelcd = KMeans(n_clusters = num_clusters)
-    labelscd = modelcd.fit_predict(Xcd)
-    for i in labelscd:
-        c.write(str(i)+'\t')
-    c.write('\n')
-
-Xem = genfromtxt('clusteringem.txt', delimiter='\t')
-Xem[np.isnan(Xem)] = 0
-Xem = np.apply_along_axis(smooth28, 1, Xem)
-for num_clusters in range(2,21): # 2 to 20 inclusive (19 lines)
-    modelem = KMeans(n_clusters = num_clusters)
-    labelsem = modelem.fit_predict(Xem)
-    for i in labelsem:
-        c.write(str(i)+'\t')
-    c.write('\n')
-# 38 lines total
-
-c.flush()
-os.fsync(c.fileno())
-c.close()
-
-
 
 # Extract dates and deaths from input files
 # datesD refers to dates with respect to deaths
@@ -4966,4 +4924,7 @@ f.write('Change in beta in England between 29 June 2020 and 17 August 2020, minu
 f.write('If the mask policy was effective, this number should be negative and significantly different from zero.\n')
 f.write(str((beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[196] - beta_SE_smoothed[147])))
 
+f.flush()
+os.fsync(f.fileno())
 f.close()
+print("Finished!")
