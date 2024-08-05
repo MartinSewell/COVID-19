@@ -12,7 +12,6 @@ import os
 import scipy.optimize as optimize
 import statistics
 from numpy import genfromtxt
-from sklearn.cluster import KMeans
 
 # Abbreviations:
 # UK United Kingdom
@@ -1435,8 +1434,6 @@ figCDLV.savefig("coviddeathslockdownvax.png")
 
 
 
-
-
 # COVID DEATHS
 coviddeathshighcd = genfromtxt('coviddeathshighcd.txt', delimiter='\t')
 coviddeathshighem = genfromtxt('coviddeathshighem.txt', delimiter='\t')
@@ -1850,71 +1847,70 @@ fig19.savefig("vaccinationsEM.png")
 plt.close('all')
 
 
-
 with open('countrylist.txt', 'r') as file:
     countries = file.read().splitlines()
 
 for i, c in enumerate(countries):
     cf = c.replace(" ", "_")
-    DZAdata = genfromtxt(cf + '.txt', delimiter='\t', converters = {0: date_parser})
-    dates = [row[0] for row in DZAdata]
-    DZAlockdown = [row[1] for row in DZAdata]
-    DZAmasks = [row[2] for row in DZAdata]    
-    DZAvax = [row[3] for row in DZAdata]
-    DZAcoviddeaths = [row[4] for row in DZAdata]
-    DZAexcessmortality = [row[5] for row in DZAdata]
-    DZAlockdown0 = [ 0 if np.isnan(x) else x for x in DZAlockdown ]
-    DZAmasks0 = [ 0 if np.isnan(x) else x for x in DZAmasks ]
-    DZAvax0 = [ 0 if np.isnan(x) else x for x in DZAvax ]
-    DZAcoviddeaths0 = [ 0 if np.isnan(x) else x for x in DZAcoviddeaths ]
-    DZAexcessmortality0 = [ 0 if np.isnan(x) else x for x in DZAexcessmortality ]
+    CNTRYdata = genfromtxt(cf + '.txt', delimiter='\t', converters = {0: date_parser})
+    dates = [row[0] for row in CNTRYdata]
+    CNTRYlockdown = [row[1] for row in CNTRYdata]
+    CNTRYmasks = [row[2] for row in CNTRYdata]    
+    CNTRYvax = [row[3] for row in CNTRYdata]
+    CNTRYcoviddeaths = [row[4] for row in CNTRYdata]
+    CNTRYexcessmortality = [row[5] for row in CNTRYdata]
+    CNTRYlockdown0 = [ 0 if np.isnan(x) else x for x in CNTRYlockdown ]
+    CNTRYmasks0 = [ 0 if np.isnan(x) else x for x in CNTRYmasks ]
+    CNTRYvax0 = [ 0 if np.isnan(x) else x for x in CNTRYvax ]
+    CNTRYcoviddeaths0 = [ 0 if np.isnan(x) else x for x in CNTRYcoviddeaths ]
+    CNTRYexcessmortality0 = [ 0 if np.isnan(x) else x for x in CNTRYexcessmortality ]
     
-    if (not all(val == 0 for val in DZAlockdown0)) or (not all(val == 0 for val in DZAmasks0)) or (not all(val == 0 for val in DZAvax0)) or (not all(val == 0 for val in DZAcoviddeaths0)) or (not all(val == 0 for val in DZAexcessmortality0)):
+    if (not all(val == 0 for val in CNTRYlockdown0)) or (not all(val == 0 for val in CNTRYmasks0)) or (not all(val == 0 for val in CNTRYvax0)) or (not all(val == 0 for val in CNTRYcoviddeaths0)) or (not all(val == 0 for val in CNTRYexcessmortality0)):
         figc = plt.figure(facecolor='w')
         axc = figc.add_subplot(111, axisbelow=True)
-        DZA1 = DZA2 = DZA3 = DZA4 = DZA5 = []
+        CNTRY1 = CNTRY2 = CNTRY3 = CNTRY4 = CNTRY5 = []
         ls = ms = vs = cds = ems = ''
-        if sum(DZAlockdown0) > 0:
-            DZA1 = axc.plot(dates, DZAlockdown, alpha=0.5, lw=2, label='Lockdown stringency', color='grey')
+        if sum(CNTRYlockdown0) > 0:
+            CNTRY1 = axc.plot(dates, CNTRYlockdown, alpha=0.5, lw=2, label='Lockdown stringency', color='grey')
             ls = 'Lockdown stringency, '
-        if sum(DZAmasks0) > 0:
-            DZAmasks2 = np.multiply(DZAmasks, 10)
-            DZA2 = axc.plot(dates, DZAmasks2, alpha=0.5, lw=2, label='Mask index', color='c')
-            if sum(DZAlockdown0) == 0:
+        if sum(CNTRYmasks0) > 0:
+            CNTRYmasks2 = np.multiply(CNTRYmasks, 10)
+            CNTRY2 = axc.plot(dates, CNTRYmasks2, alpha=0.5, lw=2, label='Mask index', color='c')
+            if sum(CNTRYlockdown0) == 0:
                 ms = r'Mask index $\times$10, '
-            if sum(DZAlockdown0) > 0:
+            if sum(CNTRYlockdown0) > 0:
                 ms = r'mask index $\times$10, '
-            if sum(DZAlockdown0) == 0 and sum(DZAvax0) == 0 and sum(DZAcoviddeaths0) > 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYvax0) == 0 and sum(CNTRYcoviddeaths0) > 0:
                 ms = r'Mask index $\times$10 '
-        if sum(DZAvax0) > 0:
-            DZAvax2 = np.multiply(DZAvax, 100)
-            DZA3 = axc.plot(dates, smooth(DZAvax2, 28), alpha=0.5, lw=2, label='Vaccination rate', color='b')
-        if sum(DZAcoviddeaths0) > 0:
-            DZAcoviddeaths2 = np.multiply(DZAcoviddeaths, 10)
-            DZA4 = axc.plot(dates, smooth(DZAcoviddeaths2, 28), alpha=0.5, lw=2, label='COVID-19 death rate', color='k')
+        if sum(CNTRYvax0) > 0:
+            CNTRYvax2 = np.multiply(CNTRYvax, 100)
+            CNTRY3 = axc.plot(dates, smooth(CNTRYvax2, 28), alpha=0.5, lw=2, label='Vaccination rate', color='b')
+        if sum(CNTRYcoviddeaths0) > 0:
+            CNTRYcoviddeaths2 = np.multiply(CNTRYcoviddeaths, 10)
+            CNTRY4 = axc.plot(dates, smooth(CNTRYcoviddeaths2, 28), alpha=0.5, lw=2, label='COVID-19 death rate', color='k')
              
-        if sum(DZAvax0) > 0:
-            if sum(DZAlockdown0) == 0 and sum(DZAmasks0) == 0 and sum(DZAcoviddeaths0) == 0:
+        if sum(CNTRYvax0) > 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYcoviddeaths0) == 0:
                 vs = 'Vaccination rate/10,000'
-            if sum(DZAlockdown0) == 0 and sum(DZAmasks0) == 0 and sum(DZAcoviddeaths0) > 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYcoviddeaths0) > 0:
                 vs = 'Vaccination rate/10,000 '
             else:
                 vs = 'vaccination rate/10,000'
                 
-        if sum(DZAcoviddeaths0) > 0:
-            if sum(DZAlockdown0) == 0 and sum(DZAmasks0) == 0 and sum(DZAvax0) == 0:
+        if sum(CNTRYcoviddeaths0) > 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYvax0) == 0:
                 cds = 'COVID-19 deaths/100,000' 
-            if sum(DZAlockdown0) == 0 and sum(DZAmasks0) == 0 and sum(DZAvax0) > 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYvax0) > 0:
                 cds = 'and COVID-19 deaths/100,000'
-            if sum(DZAlockdown0) > 0 and sum(DZAmasks0) > 0 and sum(DZAvax0) > 0:
+            if sum(CNTRYlockdown0) > 0 and sum(CNTRYmasks0) > 0 and sum(CNTRYvax0) > 0:
                 cds = '\nand COVID-19 deaths/100,000'
-            if sum(DZAlockdown0) == 0 and sum(DZAmasks0) > 0 and sum(DZAvax0) == 0:
+            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) > 0 and sum(CNTRYvax0) == 0:
                 cds = 'and COVID-19 deaths/100,000'
      
         axc.set_ylabel(ls + ms + vs + cds)
-        if not all(val == 0 for val in DZAexcessmortality0):
+        if not all(val == 0 for val in CNTRYexcessmortality0):
             axem = axc.twinx()
-            DZA5 = axem.plot(dates, smooth(DZAexcessmortality, 28), alpha=0.5, lw=2, label='Excess mortality', color='r')
+            CNTRY5 = axem.plot(dates, smooth(CNTRYexcessmortality, 28), alpha=0.5, lw=2, label='Excess mortality', color='r')
             axem._get_lines.prop_cycler = axc._get_lines.prop_cycler
             axem.set_ylabel('Excess mortality P-scores')
             lines, labels = axc.get_legend_handles_labels()
@@ -1938,11 +1934,6 @@ for i, c in enumerate(countries):
         axc.set_title(c)
         figc.savefig(cf + ".png")
         plt.close('all')
-  
-  
-    
-
-    
 
 # Sweden United Kingdom lockdowns
 SWEGBRdata = genfromtxt('SWEGBR.txt', delimiter='\t', converters = {0: date_parser})
