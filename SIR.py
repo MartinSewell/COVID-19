@@ -1,7 +1,7 @@
 # The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 # Martin Sewell
 # martin.sewell@cantab.net
-# 26 July 2024
+# 5 August 2024
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -13,8 +13,6 @@ import scipy.optimize as optimize
 import statistics
 from numpy import genfromtxt
 from sklearn.cluster import KMeans
-
-
 
 
 # Abbreviations:
@@ -386,7 +384,7 @@ if resultUK.success:
     r_UK = resultUK.x[1]
     t0_UK = resultUK.x[2]
 else:
-    raise ValueError(result.message)
+    raise ValueError(resultUK.message)
 
 GompUK = [0.0] * (last_UK_epi_index+1)
 for t, y in enumerate(GompUK):
@@ -502,7 +500,7 @@ if resultUKbefore.success:
     r_UKbefore = resultUKbefore.x[1]
     t0_UKbefore = resultUKbefore.x[2]
 else:
-    raise ValueError(result.message)
+    raise ValueError(resultUKbefore.message)
 
 GompUKbefore = [0.0] * ((first_day_UK_lockdown_index-1)+1)
 for t, y in enumerate(GompUKbefore):
