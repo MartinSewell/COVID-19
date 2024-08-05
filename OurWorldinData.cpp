@@ -3623,9 +3623,9 @@ int main()
 	clusteringemfile.close();
 
 	std::cout << std::endl;
-	std::cout << "1) Copy this program's output files to the Python code directory." << std::endl;
-	std::cout << "2) Run the Python code (ignore errors)." << std::endl;
-	std::cout << "3) Copy clusters.txt from the Python directory to the C++ directory." << std::endl;
+	std::cout << "1) Copy this program's output files to the directory containing clustering.py." << std::endl;
+	std::cout << "2) Run clustering.py." << std::endl;
+	std::cout << "3) Copy clusters.txt from the clustering.py directory to the directory containg OurWorldinData.exe." << std::endl;
 	std::cout << "4) ";
 	system("pause");
 	
@@ -6743,8 +6743,8 @@ int main()
 	double secs = diff.count() - mins*60;
 	//std::cout << "Elapsed time: " << mins << " minutes " << secs << " seconds" << std::endl;
 	std::cout << "Finished!" << std::endl;
-	std::cout << "5) Copy the C++ output files to the Python directory." << std::endl;
-	std::cout << "6) Run the Python code again." << std::endl;
+	std::cout << "5) Copy this program's output files to the directory containing SIR.py." << std::endl;
+	std::cout << "6) Run SIR.py." << std::endl;
 	std::cin.get();
 	return 0;
 }
