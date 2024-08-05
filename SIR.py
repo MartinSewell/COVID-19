@@ -429,12 +429,9 @@ fig7.autofmt_xdate()
 ax7.grid(visible=True)
 legend = ax7.legend()
 legend.get_frame().set_alpha(1)
-
-#    ax7.spines[spine].set_visible(False)
 fig7.savefig("fig2.pdf") # second figure in paper
 ax7.set_title('Sweden infections and fitted first derivative of the Gompertz function')
 fig7.savefig("fig7.png")
-
 
 # Gompertz function - UK before lockdown
 
@@ -730,8 +727,6 @@ ax14.set_xlim(80, 20) #ax14.set_xlim(100, 60)
 ax14.set_ylim(0,0.6) #ax14.set_ylim(0,0.3)
 legend = ax14.legend()
 legend.get_frame().set_alpha(1)
-
-#    ax14.spines[spine].set_visible(False)
 fig14.savefig("fig3.pdf") # third figure in paper
 ax14.set_title(r'$\beta$ vs $\frac{S}{N}$ in the COVID-19 SIR model, data up to 30 June 2021')
 fig14.savefig("fig14.png")
@@ -844,8 +839,6 @@ ax16.set_xlim([dt.date(2020, 2, 28), dt.date(2020, 4, 17)])
 ax16.set_ylim(-0.25,0.25) # ax16.set_ylim(-0.2,0.2)
 legend = ax16.legend()
 legend.get_frame().set_alpha(1)
-
-#    ax16.spines[spine].set_visible(False)
 fig16.savefig("fig4.pdf") # fourth figure in paper
 ax16.set_title(r'Smoothed $\frac{\textrm{d}\beta}{\textrm{d}\frac{S}{N}}$ as the UK transitioned into its first lockdown')
 fig16.savefig("fig16.png")
@@ -904,8 +897,6 @@ ax18.set_xlim([dt.date(2020, 6, 29), dt.date(2020, 8, 17)])
 ax18.set_ylim(0,0.3) #ax18.set_ylim(0,0.2)
 legend = ax18.legend()
 legend.get_frame().set_alpha(1)
-
-#    ax18.spines[spine].set_visible(False)
 fig18.savefig("fig5.pdf") # fifth figure in paper
 ax18.set_title('The effect of making masks mandatory in enclosed public places in England')
 fig18.savefig("fig18.png")
@@ -956,7 +947,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownlowvax.pdf")
 axLV.set_title('Excess mortality for countries with low lockdown stringency')
 figLV.savefig("lockdownlowvax.png")
@@ -993,7 +983,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownmedvax.pdf")
 axLV.set_title('Excess mortality for countries with medium lockdown stringency')
 figLV.savefig("lockdownmedvax.png")
@@ -1031,13 +1020,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownhighvax.pdf")
 axLV.set_title('Excess mortality for countries with high lockdown stringency')
 figLV.savefig("lockdownhighvax.png")
-
-
-
 
 
 
@@ -1073,7 +1058,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownlowvax.pdf")
 axLV.set_title('Excess mortality for countries with low vaccination rates')
 figLV.savefig("lockdownlowvax.png")
@@ -1110,7 +1094,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownmedvax.pdf")
 axLV.set_title('Excess mortality for countries with medium vaccination rates')
 figLV.savefig("lockdownmedvax.png")
@@ -1148,7 +1131,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("lockdownhighvax.pdf")
 axLV.set_title('Excess mortality for countries with high vaccination rates')
 figLV.savefig("lockdownhighvax.png")
@@ -1189,7 +1171,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("maskslowvax.pdf")
 axLV.set_title('Excess mortality for countries with low vaccination rates')
 figLV.savefig("maskslowvax.png")
@@ -1226,7 +1207,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("masksmedvax.pdf")
 axLV.set_title('Excess mortality for countries with medium vaccination rates')
 figLV.savefig("masksmedvax.png")
@@ -1264,16 +1244,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("maskshighvax.pdf")
 axLV.set_title('Excess mortality for countries with high vaccination rates')
 figLV.savefig("maskshighvax.png")
-
-
-
-
-
-
 
 
 # LOW COVIDDEATHS VS VAX
@@ -1308,7 +1281,6 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("coviddeathslowvax.pdf")
 axLV.set_title('Excess mortality for countries with a low COVID-19 death rate')
 figLV.savefig("coviddeathslowvax.png")
@@ -1784,7 +1756,6 @@ for c, d in enumerate(numclust):
             ax19.set_title(titleem)
             fig19.savefig(d+"_vaccinationsEM"+b+".png")
             plt.close('all')
-
 
 
 # Vax and excess mortality
@@ -2390,7 +2361,6 @@ ax19.set_title('Vaccinations and excess mortality for Bhutan and Singapore')
 fig19.savefig("BhutanSingapore.png")
 plt.close('all')
 
-
 vaxdata = genfromtxt('BhutanThailandCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -2454,8 +2424,6 @@ fig19.savefig("BhutanThailand.pdf")
 ax19.set_title('Vaccinations and excess mortality for Bhutan and Thailand')
 fig19.savefig("BhutanThailand.png")
 plt.close('all')
-
-
 
 vaxdata = genfromtxt('BosniaandHerzegovinaRomania.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
@@ -2521,7 +2489,6 @@ ax19.set_title('Vaccinations and excess mortality for Bulgaria and Serbia')
 fig19.savefig("BulgariaSerbia.png")
 plt.close('all')
 
-
 vaxdata = genfromtxt('BurundiEritreaCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_ARM = [row[1] for row in vaxdata]
@@ -2585,7 +2552,6 @@ fig19.savefig("BurundiSeychellesCD.pdf")
 ax19.set_title('Vaccinations and COVID-19 deaths for Burundi and Seychelles')
 fig19.savefig("BurundiSeychellesCD.png")
 plt.close('all')
-
 
 vaxdata = genfromtxt('CambodiaVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
@@ -2717,7 +2683,6 @@ ax19.set_title('Vaccinations and excess mortality for Cape Verde and Tunisia')
 fig19.savefig("CapeVerdeTunisia.png")
 plt.close('all')
 
-
 vaxdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -2751,8 +2716,6 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Croatia and Hungary')
 fig19.savefig("CroatiaHungaryCD.png")
 plt.close('all')
 
-
-
 vaxdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -2784,7 +2747,6 @@ fig19.savefig("CroatiaHungaryCDdiff.pdf")
 ax19.set_title('Vaccinations and COVID-19 deaths for Croatia and Hungary')
 fig19.savefig("CroatiaHungaryCDdiff.png")
 plt.close('all')
-
 
 
 
@@ -4132,7 +4094,6 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Mauritius and Seychelles')
 fig19.savefig("MauritiusSeychellesCD.png")
 plt.close('all')
 
-
 vaxdata = genfromtxt('MauritiusSeychelles.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -4164,11 +4125,6 @@ fig19.savefig("MauritiusSeychelles.pdf")
 ax19.set_title('Vaccinations and excess mortality for Mauritius and Seychelles')
 fig19.savefig("MauritiusSeychelles.png")
 plt.close('all')
-
-
-
-
-
 
 vaxdata = genfromtxt('MongoliaThailandCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
@@ -4234,11 +4190,6 @@ ax19.set_title('Vaccinations and excess mortality for Mongolia and Thailand')
 fig19.savefig("MongoliaThailand.png")
 plt.close('all')
 
-
-
-
-
-
 vaxdata = genfromtxt('PapuaNewGuineaSolomonIslandsCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_ARM = [row[1] for row in vaxdata]
@@ -4271,12 +4222,6 @@ ax29.set_title('Vaccinations and excess mortality for PapuaNewGuinea and Solomon
 fig29.savefig("PapuaNewGuineaSolomonIslandsCD.png")
 plt.close('all')
 
-
-
-
-
-
-
 vaxdata = genfromtxt('PhilippinesSouthKorea.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -4308,9 +4253,6 @@ fig19.savefig("PhilippinesSouthKorea.pdf")
 ax19.set_title('Vaccinations and excess mortality for Philippines and South Korea')
 fig19.savefig("PhilippinesSouthKorea.png")
 plt.close('all')
-
-
-
 
 vaxdata = genfromtxt('RomaniaRussiaCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
@@ -4345,8 +4287,6 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Romania and Russia')
 fig19.savefig("RomaniaRussiaCD.png")
 plt.close('all')
 
-
-
 vaxdata = genfromtxt('RomaniaRussia.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -4378,19 +4318,6 @@ fig19.savefig("RomaniaRussia.pdf")
 ax19.set_title('Vaccinations and excess mortality for Romania and Russia')
 fig19.savefig("RomaniaRussia.png")
 plt.close('all')
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 RWAUGAdata = genfromtxt('RwandaUganda.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in RWAUGAdata]
@@ -4425,7 +4352,6 @@ ax19.set_title('Vaccinations and excess mortality for Rwanda and Uganda')
 fig19.savefig("RwandaUganda.png")
 plt.close('all')
 
-
 vaxdata = genfromtxt('SeychellesTanzaniaCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
 vax_DZA = [row[1] for row in vaxdata]
@@ -4457,7 +4383,6 @@ fig19.savefig("SeychellesTanzaniaCD.pdf")
 ax19.set_title('Vaccinations and COVID-19 deaths for Seychelles and Tanzania')
 fig19.savefig("SeychellesTanzaniaCD.png")
 plt.close('all')
-
 
 vaxdata = genfromtxt('SingaporeThailandCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in vaxdata]
@@ -4523,11 +4448,6 @@ ax19.set_title('Vaccinations and excess mortality for Singapore and Thailand')
 fig19.savefig("SingaporeThailand.png")
 plt.close('all')
 
-
-
-
-
-
 THAVNMdata = genfromtxt('ThailandVietnam.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in THAVNMdata]
 vax_THA = [row[1] for row in THAVNMdata]
@@ -4560,9 +4480,6 @@ ax19.set_title('Vaccinations and excess mortality for Thailand and Vietnam')
 fig19.savefig("ThailandVietnam.png")
 plt.close('all')
 
-
-
-
 ZambiaZimbabwedata = genfromtxt('ZambiaZimbabwe.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in ZambiaZimbabwedata]
 vax_ZMB = [row[1] for row in ZambiaZimbabwedata]
@@ -4594,14 +4511,6 @@ fig19.savefig("ZambiaZimbabwe.pdf")
 ax19.set_title('Vaccinations and excess mortality for Zambia and Zimbabwe')
 fig19.savefig("ZambiaZimbabwe.png")
 plt.close('all')
-
-
-
-
-
-
-
-
 
 
 
