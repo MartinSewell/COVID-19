@@ -1,7 +1,7 @@
 // The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 // Martin Sewell
 // martin.sewell@cantab.net
-// 5 August 2024
+// 7 August 2024
 
 // INPUT FILES: [all downloaded on 1 August 2024]
 // Info on data: [For information only, do not need this.]
@@ -49,7 +49,7 @@
 // p_avg_all_ages
 // excess-mortality-p-scores-average-baseline-by-age.csv
 // Entity,Code,Day,p_avg_0_14,p_avg_15_64,p_avg_65_74,p_avg_75_84,p_avg_85p,p_avg_all_ages
-// Albania, ALB, 2020 - 01 - 31, , , , , , -10.65
+// Albania,ALB, 2020-01-31,,,,,,-10.65
 // Uzbekistan,UZB,2023-06-30,,,,,,20.93
 
 #include <algorithm>
@@ -146,7 +146,46 @@ double p_norm(std::vector<double> a, std::vector<double> b, double p) {
 		d += std::pow(std::abs(a[i] - b[i]), p);
 	}
 	return std::pow(d, 1.0 / p);
-};
+}
+
+
+
+std::vector<double> Interpolate(std::vector<double> v) {
+    std::vector<double> interpolated;
+	interpolated = v;
+	std::vector<double> x;
+	std::vector<double> y;
+	for (unsigned int d = 0; d < v.size(); d++) {
+		if (!isnan(v[d])) {
+			x.push_back(double(d));
+			y.push_back(v[d]);
+		}
+	}
+	int first = -1;
+	int last = -1;
+	bool firstcase = true;
+	for (unsigned int d = 0; d < interpolated.size(); d++)
+		if (!isnan(v[d])) {
+			if (firstcase == true) {
+				first = d;
+				firstcase = false;
+			}
+			last = d;
+		}
+	if (x.size() > 0) {
+		boost::math::interpolators::barycentric_rational<double> interpolant(x.data(), y.data(), x.size(), 0);
+		for (unsigned int d = 0; d < interpolated.size(); d++) {
+			if (first <= d && d <= last) {
+				interpolated[d] = interpolant(double(d));
+			}
+		}
+	}
+	x.clear();
+	y.clear();
+	return interpolated;
+}
+
+
 
 
 int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std::vector < std::vector<double> > vaccinations, std::vector<double> cumvax, std::vector < std::vector<double> > coviddeaths, std::vector < std::vector<double> > excessmortalitypscoreinterpolated) {
@@ -576,20 +615,7 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 	}
 
 
-
-
-
-
-
-
-
 	std::string s = std::to_string(c);
-
-
-
-
-
-
 
 
 	std::string clustcd0_vaxlow_filename;
@@ -686,7 +712,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustcd1_vaxmed_file << std::endl;
 	}
 
-
 	std::string clustcd1_vaxhigh_filename;
 	clustcd1_vaxhigh_filename = s + "_clustcd1_vaxhigh.txt";
 	std::ofstream clustcd1_vaxhigh_file;
@@ -704,7 +729,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustcd1_vaxhigh_vx_file << std::endl;
 		clustcd1_vaxhigh_file << std::endl;
 	}
-
 
 	std::string clustcd2_vaxlow_filename;
 	clustcd2_vaxlow_filename = s + "_clustcd2_vaxlow.txt";
@@ -754,7 +778,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustcd2_vaxhigh_vx_file << std::endl;
 		clustcd2_vaxhigh_file << std::endl;
 	}
-
 
 	std::string clustcd3_vaxlow_filename;
 	clustcd3_vaxlow_filename = s + "_clustcd3_vaxlow.txt";
@@ -1000,7 +1023,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustcd7_vaxhigh_vx_file << std::endl;
 		clustcd7_vaxhigh_file << std::endl;
 	}
-
 
 	std::string clustcd8_vaxlow_filename;
 	clustcd8_vaxlow_filename = s + "_clustcd8_vaxlow.txt";
@@ -1695,7 +1717,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustem1_vaxmed_file << std::endl;
 	}
 
-
 	std::string clustem1_vaxhigh_filename;
 	clustem1_vaxhigh_filename = s + "_clustem1_vaxhigh.txt";
 	std::ofstream clustem1_vaxhigh_file;
@@ -1713,7 +1734,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustem1_vaxhigh_vx_file << std::endl;
 		clustem1_vaxhigh_file << std::endl;
 	}
-
 
 	std::string clustem2_vaxlow_filename;
 	clustem2_vaxlow_filename = s + "_clustem2_vaxlow.txt";
@@ -1812,7 +1832,6 @@ int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std:
 		clustem3_vaxhigh_vx_file << std::endl;
 		clustem3_vaxhigh_file << std::endl;
 	}
-
 
 	std::string clustem4_vaxlow_filename;
 	clustem4_vaxlow_filename = s + "_clustem4_vaxlow.txt";
@@ -3039,8 +3058,8 @@ int main()
 	std::vector<double> HUNexcessmortalitypscore_75_84interpolated(numdates, nan(""));
 	std::vector<double> HUNexcessmortalitypscore_85pinterpolated(numdates, nan(""));
 
-
-
+    // Entity,Code,Day,p_avg_0_14,p_avg_15_64,p_avg_65_74,p_avg_75_84,p_avg_85p,p_avg_all_ages
+    // Croatia,HRV,2020-01-05,14.29,-7.84,-3.74,-28.37,-8.06,-14.47
 	std::string excessmortalitypscorefilename;
 	excessmortalitypscorefilename = "excess-mortality-p-scores-average-baseline-by-age.csv";
 	std::ifstream excessmortalitypscorefile;
@@ -3183,8 +3202,6 @@ int main()
 
 
 	excessmortalitypscoreinterpolated = excessmortalitypscore;
-
-
 	std::vector<double> x;
 	std::vector<double> y;
 	for (unsigned int c = 0; c < excessmortalitypscore.size(); c++) {
@@ -3218,6 +3235,19 @@ int main()
 		x.clear();
 		y.clear();
 	}
+	
+	HRVexcessmortalitypscore_0_14interpolated = Interpolate(HRVexcessmortalitypscore_0_14);
+    HRVexcessmortalitypscore_15_64interpolated = Interpolate(HRVexcessmortalitypscore_15_64);
+    HRVexcessmortalitypscore_65_74interpolated = Interpolate(HRVexcessmortalitypscore_65_74);
+    HRVexcessmortalitypscore_75_84interpolated = Interpolate(HRVexcessmortalitypscore_75_84);
+    HRVexcessmortalitypscore_85pinterpolated = Interpolate(HRVexcessmortalitypscore_85p);
+
+    HUNexcessmortalitypscore_0_14interpolated = Interpolate(HUNexcessmortalitypscore_0_14);
+    HUNexcessmortalitypscore_15_64interpolated = Interpolate(HUNexcessmortalitypscore_15_64);
+    HUNexcessmortalitypscore_65_74interpolated = Interpolate(HUNexcessmortalitypscore_65_74);
+    HUNexcessmortalitypscore_75_84interpolated = Interpolate(HUNexcessmortalitypscore_75_84);
+    HUNexcessmortalitypscore_85pinterpolated = Interpolate(HUNexcessmortalitypscore_85p);
+	
 	std::cout << ".";
 
 
@@ -4778,7 +4808,7 @@ int main()
 	ci1 = CountryIndex(code, "DZA");
 	ci2 = CountryIndex(code, "EGY");
 	std::string AlgeriaEgyptfilename;
-	AlgeriaEgyptfilename = "AlgeriaEgypt.txt";
+	AlgeriaEgyptfilename = "AlgeriaEgyptEM.txt";
 	std::ofstream AlgeriaEgyptfile;
 	AlgeriaEgyptfile.open(AlgeriaEgyptfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4796,16 +4826,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-
-
-
-
-	// Antigua and Barbuda vs Cuba
+	// Antigua and Barbuda vs Cuba EM
 	ci1 = CountryIndex(code, "ATG");
 	ci2 = CountryIndex(code, "CUB");
 	std::string AntiguaandBarbudaCubafilename;
-	AntiguaandBarbudaCubafilename = "AntiguaandBarbudaCuba.txt";
+	AntiguaandBarbudaCubafilename = "AntiguaandBarbudaCubaEM.txt";
 	std::ofstream AntiguaandBarbudaCubafile;
 	AntiguaandBarbudaCubafile.open(AntiguaandBarbudaCubafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4823,14 +4848,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-
-
-	// Argentina vs Paraguay
+	// Argentina vs Paraguay EM
 	ci1 = CountryIndex(code, "ARG");
 	ci2 = CountryIndex(code, "PRY");
 	std::string ArgentinaParaguayfilename;
-	ArgentinaParaguayfilename = "ArgentinaParaguay.txt";
+	ArgentinaParaguayfilename = "ArgentinaParaguayEM.txt";
 	std::ofstream ArgentinaParaguayfile;
 	ArgentinaParaguayfile.open(ArgentinaParaguayfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4847,8 +4869,6 @@ int main()
 		ArgentinaParaguayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
-
 
 	// Armenia vs Azerbaijan CD
 	ci1 = CountryIndex(code, "ARM");
@@ -4872,13 +4892,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-
-	// Armenia vs Azerbaijan
+	// Armenia vs Azerbaijan EM
 	ci1 = CountryIndex(code, "ARM");
 	ci2 = CountryIndex(code, "AZE");
 	std::string ArmeniaAzerbaijanfilename;
-	ArmeniaAzerbaijanfilename = "ArmeniaAzerbaijan.txt";
+	ArmeniaAzerbaijanfilename = "ArmeniaAzerbaijanEM.txt";
 	std::ofstream ArmeniaAzerbaijanfile;
 	ArmeniaAzerbaijanfile.open(ArmeniaAzerbaijanfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4896,11 +4914,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Australia vs French Polynesia
+	// Australia vs French Polynesia EM
 	ci1 = CountryIndex(code, "AUS");
 	ci2 = CountryIndex(code, "PYF");
 	std::string AustraliaFrenchPolynesiafilename;
-	AustraliaFrenchPolynesiafilename = "AustraliaFrenchPolynesia.txt";
+	AustraliaFrenchPolynesiafilename = "AustraliaFrenchPolynesiaEM.txt";
 	std::ofstream AustraliaFrenchPolynesiafile;
 	AustraliaFrenchPolynesiafile.open(AustraliaFrenchPolynesiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4918,11 +4936,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Australia vs New Caledonia
+	// Australia vs New Caledonia EM
 	ci1 = CountryIndex(code, "AUS");
 	ci2 = CountryIndex(code, "NCL");
 	std::string AustraliaNewCaledoniafilename;
-	AustraliaNewCaledoniafilename = "AustraliaNewCaledonia.txt";
+	AustraliaNewCaledoniafilename = "AustraliaNewCaledoniaEM.txt";
 	std::ofstream AustraliaNewCaledoniafile;
 	AustraliaNewCaledoniafile.open(AustraliaNewCaledoniafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4939,7 +4957,6 @@ int main()
 		AustraliaNewCaledoniafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Australia vs New Zealand CD
 	ci1 = CountryIndex(code, "AUS");
@@ -4963,12 +4980,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Australia vs New Zealand
+	// Australia vs New Zealand EM
 	ci1 = CountryIndex(code, "AUS");
 	ci2 = CountryIndex(code, "NZL");
 	std::string AustraliaNewZealandfilename;
-	AustraliaNewZealandfilename = "AustraliaNewZealand.txt";
+	AustraliaNewZealandfilename = "AustraliaNewZealandEM.txt";
 	std::ofstream AustraliaNewZealandfile;
 	AustraliaNewZealandfile.open(AustraliaNewZealandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -4986,11 +5002,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Australia vs Malaysia
+	// Australia vs Malaysia EM
 	ci1 = CountryIndex(code, "AUS");
 	ci2 = CountryIndex(code, "MYS");
 	std::string AustraliaMalaysiafilename;
-	AustraliaMalaysiafilename = "AustraliaMalaysia.txt";
+	AustraliaMalaysiafilename = "AustraliaMalaysiaEM.txt";
 	std::ofstream AustraliaMalaysiafile;
 	AustraliaMalaysiafile.open(AustraliaMalaysiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5030,12 +5046,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Belarus vs Denmark
+	// Belarus vs Denmark EM
 	ci1 = CountryIndex(code, "BLR");
 	ci2 = CountryIndex(code, "DNK");
 	std::string BelarusDenmarkfilename;
-	BelarusDenmarkfilename = "BelarusDenmark.txt";
+	BelarusDenmarkfilename = "BelarusDenmarkEM.txt";
 	std::ofstream BelarusDenmarkfile;
 	BelarusDenmarkfile.open(BelarusDenmarkfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5075,12 +5090,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Bhutan vs Singapore
+	// Bhutan vs Singapore EM
 	ci1 = CountryIndex(code, "BTN");
 	ci2 = CountryIndex(code, "SGP");
 	std::string BhutanSingaporefilename;
-	BhutanSingaporefilename = "BhutanSingapore.txt";
+	BhutanSingaporefilename = "BhutanSingaporeEM.txt";
 	std::ofstream BhutanSingaporefile;
 	BhutanSingaporefile.open(BhutanSingaporefilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5097,7 +5111,6 @@ int main()
 		BhutanSingaporefile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Bhutan vs Thailand CD
 	ci1 = CountryIndex(code, "BTN");
@@ -5121,11 +5134,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Bhutan vs Thailand
+	// Bhutan vs Thailand EM
 	ci1 = CountryIndex(code, "BTN");
 	ci2 = CountryIndex(code, "THA");
 	std::string BhutanThailandfilename;
-	BhutanThailandfilename = "BhutanThailand.txt";
+	BhutanThailandfilename = "BhutanThailandEM.txt";
 	std::ofstream BhutanThailandfile;
 	BhutanThailandfile.open(BhutanThailandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5142,7 +5155,6 @@ int main()
 		BhutanThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Bhutan vs Vietnam CD
 	ci1 = CountryIndex(code, "BTN");
@@ -5166,7 +5178,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Burundi vs Eritrea CD
 	ci1 = CountryIndex(code, "BDI");
 	ci2 = CountryIndex(code, "ERI");
@@ -5189,12 +5200,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Bosnia and Herzegovina vs Romania
+	// Bosnia and Herzegovina vs Romania EM
 	ci1 = CountryIndex(code, "BIH");
 	ci2 = CountryIndex(code, "ROU");
 	std::string BosniaandHerzegovinaRomaniafilename;
-	BosniaandHerzegovinaRomaniafilename = "BosniaandHerzegovinaRomania.txt";
+	BosniaandHerzegovinaRomaniafilename = "BosniaandHerzegovinaRomaniaEM.txt";
 	std::ofstream BosniaandHerzegovinaRomaniafile;
 	BosniaandHerzegovinaRomaniafile.open(BosniaandHerzegovinaRomaniafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5212,12 +5222,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Bulgaria vs Serbia
+	// Bulgaria vs Serbia EM
 	ci1 = CountryIndex(code, "BGR");
 	ci2 = CountryIndex(code, "SRB");
 	std::string BulgariaSerbiafilename;
-	BulgariaSerbiafilename = "BulgariaSerbia.txt";
+	BulgariaSerbiafilename = "BulgariaSerbiaEM.txt";
 	std::ofstream BulgariaSerbiafile;
 	BulgariaSerbiafile.open(BulgariaSerbiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5257,7 +5266,6 @@ int main()
 	}
 	std::cout << ".";
 
-
 	// Cambodia vs Vietnam CD
 	ci1 = CountryIndex(code, "KHM");
 	ci2 = CountryIndex(code, "VNM");
@@ -5280,12 +5288,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Canada vs Cuba
+	// Canada vs Cuba EM
 	ci1 = CountryIndex(code, "CAN");
 	ci2 = CountryIndex(code, "CUB");
 	std::string CanadaCubafilename;
-	CanadaCubafilename = "CanadaCuba.txt";
+	CanadaCubafilename = "CanadaCubaEM.txt";
 	std::ofstream CanadaCubafile;
 	CanadaCubafile.open(CanadaCubafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5303,11 +5310,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Canada vs Saint Vincent and the Grenadines
+	// Canada vs Saint Vincent and the Grenadines EM
 	ci1 = CountryIndex(code, "CAN");
 	ci2 = CountryIndex(code, "VCT");
 	std::string CanadaSaintVincentandtheGrenadinesfilename;
-	CanadaSaintVincentandtheGrenadinesfilename = "CanadaSaintVincentandtheGrenadines.txt";
+	CanadaSaintVincentandtheGrenadinesfilename = "CanadaSaintVincentandtheGrenadinesEM.txt";
 	std::ofstream CanadaSaintVincentandtheGrenadinesfile;
 	CanadaSaintVincentandtheGrenadinesfile.open(CanadaSaintVincentandtheGrenadinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5325,12 +5332,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Cape Verde vs Tunisia
+	// Cape Verde vs Tunisia EM
 	ci1 = CountryIndex(code, "CPV");
 	ci2 = CountryIndex(code, "TUN");
 	std::string CapeVerdeTunisiafilename;
-	CapeVerdeTunisiafilename = "CapeVerdeTunisia.txt";
+	CapeVerdeTunisiafilename = "CapeVerdeTunisiaEM.txt";
 	std::ofstream CapeVerdeTunisiafile;
 	CapeVerdeTunisiafile.open(CapeVerdeTunisiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5370,12 +5376,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Croatia vs Hungary
+	// Croatia vs Hungary EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungaryfilename;
-	CroatiaHungaryfilename = "CroatiaHungary.txt";
+	CroatiaHungaryfilename = "CroatiaHungaryEM.txt";
 	std::ofstream CroatiaHungaryfile;
 	CroatiaHungaryfile.open(CroatiaHungaryfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5393,12 +5398,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Croatia vs Hungary _0_14
+	// Croatia vs Hungary _0_14 EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungary_0_14filename;
-	CroatiaHungary_0_14filename = "CroatiaHungary_0_14.txt";
+	CroatiaHungary_0_14filename = "CroatiaHungary_0_14EM.txt";
 	std::ofstream CroatiaHungary_0_14file;
 	CroatiaHungary_0_14file.open(CroatiaHungary_0_14filename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5416,11 +5420,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Croatia vs Hungary _15_64
+	// Croatia vs Hungary _15_64 EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungary_15_64filename;
-	CroatiaHungary_15_64filename = "CroatiaHungary_15_64.txt";
+	CroatiaHungary_15_64filename = "CroatiaHungary_15_64EM.txt";
 	std::ofstream CroatiaHungary_15_64file;
 	CroatiaHungary_15_64file.open(CroatiaHungary_15_64filename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5438,11 +5442,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Croatia vs Hungary _65_74
+	// Croatia vs Hungary _65_74 EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungary_65_74filename;
-	CroatiaHungary_65_74filename = "CroatiaHungary_65_74.txt";
+	CroatiaHungary_65_74filename = "CroatiaHungary_65_74EM.txt";
 	std::ofstream CroatiaHungary_65_74file;
 	CroatiaHungary_65_74file.open(CroatiaHungary_65_74filename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5460,11 +5464,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Croatia vs Hungary _75_84
+	// Croatia vs Hungary _75_84 EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungary_75_84filename;
-	CroatiaHungary_75_84filename = "CroatiaHungary_75_84.txt";
+	CroatiaHungary_75_84filename = "CroatiaHungary_75_84EM.txt";
 	std::ofstream CroatiaHungary_75_84file;
 	CroatiaHungary_75_84file.open(CroatiaHungary_75_84filename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5482,11 +5486,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Croatia vs Hungary _85p
+	// Croatia vs Hungary _85p EM
 	ci1 = CountryIndex(code, "HRV");
 	ci2 = CountryIndex(code, "HUN");
 	std::string CroatiaHungary_85pfilename;
-	CroatiaHungary_85pfilename = "CroatiaHungary_85p.txt";
+	CroatiaHungary_85pfilename = "CroatiaHungary_85pEM.txt";
 	std::ofstream CroatiaHungary_85pfile;
 	CroatiaHungary_85pfile.open(CroatiaHungary_85pfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5503,8 +5507,6 @@ int main()
 		CroatiaHungary_85pfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_85pinterpolated[d] << "\t" << HUNexcessmortalitypscore_85pinterpolated[d] << std::endl;
 	}
 	std::cout << ".";
-
-
 
 	// Cuba vs Jamaica CD
 	ci1 = CountryIndex(code, "CUB");
@@ -5528,11 +5530,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Cuba vs Jamaica
+	// Cuba vs Jamaica EM
 	ci1 = CountryIndex(code, "CUB");
 	ci2 = CountryIndex(code, "JAM");
 	std::string CubaJamaicafilename;
-	CubaJamaicafilename = "CubaJamaica.txt";
+	CubaJamaicafilename = "CubaJamaicaEM.txt";
 	std::ofstream CubaJamaicafile;
 	CubaJamaicafile.open(CubaJamaicafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5550,12 +5552,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Cuba vs Saint Vincent and the Grenadines
+	// Cuba vs Saint Vincent and the Grenadines EM
 	ci1 = CountryIndex(code, "CUB");
 	ci2 = CountryIndex(code, "VCT");
 	std::string CubaSaintVincentandtheGrenadinesfilename;
-	CubaSaintVincentandtheGrenadinesfilename = "CubaSaintVincentandtheGrenadines.txt";
+	CubaSaintVincentandtheGrenadinesfilename = "CubaSaintVincentandtheGrenadinesEM.txt";
 	std::ofstream CubaSaintVincentandtheGrenadinesfile;
 	CubaSaintVincentandtheGrenadinesfile.open(CubaSaintVincentandtheGrenadinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5573,12 +5574,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-	// Denmark vs Finland
+	// Denmark vs Finland EM
 	ci1 = CountryIndex(code, "DNK");
 	ci2 = CountryIndex(code, "FIN");
 	std::string DenmarkFinlandfilename;
-	DenmarkFinlandfilename = "DenmarkFinland.txt";
+	DenmarkFinlandfilename = "DenmarkFinlandEM.txt";
 	std::ofstream DenmarkFinlandfile;
 	DenmarkFinlandfile.open(DenmarkFinlandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5596,11 +5596,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Denmark vs Germany
+	// Denmark vs Germany EM
 	ci1 = CountryIndex(code, "DNK");
 	ci2 = CountryIndex(code, "DEU");
 	std::string DenmarkGermanyfilename;
-	DenmarkGermanyfilename = "DenmarkGermany.txt";
+	DenmarkGermanyfilename = "DenmarkGermanyEM.txt";
 	std::ofstream DenmarkGermanyfile;
 	DenmarkGermanyfile.open(DenmarkGermanyfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5640,11 +5640,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Denmark vs Norway
+	// Denmark vs Norway EM
 	ci1 = CountryIndex(code, "DNK");
 	ci2 = CountryIndex(code, "NOR");
 	std::string DenmarkNorwayfilename;
-	DenmarkNorwayfilename = "DenmarkNorway.txt";
+	DenmarkNorwayfilename = "DenmarkNorwayEM.txt";
 	std::ofstream DenmarkNorwayfile;
 	DenmarkNorwayfile.open(DenmarkNorwayfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5684,13 +5684,13 @@ int main()
 	}
 	std::cout << ".";
 
-	// FaeroeIslands vs Norway CD
+	// FaroeIslands vs Norway CD
 	ci1 = CountryIndex(code, "FRO");
 	ci2 = CountryIndex(code, "NOR");
-	std::string FaeroeIslandsNorwayCDfilename;
-	FaeroeIslandsNorwayCDfilename = "FaeroeIslandsNorwayCD.txt";
-	std::ofstream FaeroeIslandsNorwayCDfile;
-	FaeroeIslandsNorwayCDfile.open(FaeroeIslandsNorwayCDfilename);
+	std::string FaroeIslandsNorwayCDfilename;
+	FaroeIslandsNorwayCDfilename = "FaroeIslandsNorwayCD.txt";
+	std::ofstream FaroeIslandsNorwayCDfile;
+	FaroeIslandsNorwayCDfile.open(FaroeIslandsNorwayCDfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
 		date_duration dd(d);
 		date d2 = firstdate + dd;
@@ -5702,17 +5702,17 @@ int main()
 			mp = "0";
 		else
 			mp = "";
-		FaeroeIslandsNorwayCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
+		FaroeIslandsNorwayCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
 	}
 	std::cout << ".";
 
-	// FaeroeIslands vs Norway
+	// FaroeIslands vs Norway EM
 	ci1 = CountryIndex(code, "FRO");
 	ci2 = CountryIndex(code, "NOR");
-	std::string FaeroeIslandsNorwayfilename;
-	FaeroeIslandsNorwayfilename = "FaeroeIslandsNorway.txt";
-	std::ofstream FaeroeIslandsNorwayfile;
-	FaeroeIslandsNorwayfile.open(FaeroeIslandsNorwayfilename);
+	std::string FaroeIslandsNorwayfilename;
+	FaroeIslandsNorwayfilename = "FaroeIslandsNorwayEM.txt";
+	std::ofstream FaroeIslandsNorwayfile;
+	FaroeIslandsNorwayfile.open(FaroeIslandsNorwayfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
 		date_duration dd(d);
 		date d2 = firstdate + dd;
@@ -5724,15 +5724,15 @@ int main()
 			mp = "0";
 		else
 			mp = "";
-		FaeroeIslandsNorwayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
+		FaroeIslandsNorwayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
 
-	// French Polynesia vs New Zealand
+	// French Polynesia vs New Zealand EM
 	ci1 = CountryIndex(code, "PYF");
 	ci2 = CountryIndex(code, "NZL");
 	std::string FrenchPolynesiaNewZealandfilename;
-	FrenchPolynesiaNewZealandfilename = "FrenchPolynesiaNewZealand.txt";
+	FrenchPolynesiaNewZealandfilename = "FrenchPolynesiaNewZealandEM.txt";
 	std::ofstream FrenchPolynesiaNewZealandfile;
 	FrenchPolynesiaNewZealandfile.open(FrenchPolynesiaNewZealandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5750,11 +5750,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Gibraltar vs India
+	// Gibraltar vs India CD
 	ci1 = CountryIndex(code, "GIB");
 	ci2 = CountryIndex(code, "IND");
 	std::string GibraltarIndiafilename;
-	GibraltarIndiafilename = "GibraltarIndia.txt";
+	GibraltarIndiafilename = "GibraltarIndiaCD.txt";
 	std::ofstream GibraltarIndiafile;
 	GibraltarIndiafile.open(GibraltarIndiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5772,11 +5772,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Greece vs Serbia
+	// Greece vs Serbia EM
 	ci1 = CountryIndex(code, "GRC");
 	ci2 = CountryIndex(code, "SRB");
 	std::string GreeceSerbiafilename;
-	GreeceSerbiafilename = "GreeceSerbia.txt";
+	GreeceSerbiafilename = "GreeceSerbiaEM.txt";
 	std::ofstream GreeceSerbiafile;
 	GreeceSerbiafile.open(GreeceSerbiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5794,11 +5794,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Hong Kong vs Macao
+	// Hong Kong vs Macao EM
 	ci1 = CountryIndex(code, "HKG");
 	ci2 = CountryIndex(code, "MAC");
 	std::string HongKongMacaofilename;
-	HongKongMacaofilename = "HongKongMacao.txt";
+	HongKongMacaofilename = "HongKongMacaoEM.txt";
 	std::ofstream HongKongMacaofile;
 	HongKongMacaofile.open(HongKongMacaofilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5838,11 +5838,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Hong Kong vs Philippines
+	// Hong Kong vs Philippines EM
 	ci1 = CountryIndex(code, "HKG");
 	ci2 = CountryIndex(code, "PHL");
 	std::string HongKongPhilippinesfilename;
-	HongKongPhilippinesfilename = "HongKongPhilippines.txt";
+	HongKongPhilippinesfilename = "HongKongPhilippinesEM.txt";
 	std::ofstream HongKongPhilippinesfile;
 	HongKongPhilippinesfile.open(HongKongPhilippinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5860,11 +5860,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Hong Kong vs South Korea
+	// Hong Kong vs South Korea EM
 	ci1 = CountryIndex(code, "HKG");
 	ci2 = CountryIndex(code, "KOR");
 	std::string HongKongSouthKoreafilename;
-	HongKongSouthKoreafilename = "HongKongSouthKorea.txt";
+	HongKongSouthKoreafilename = "HongKongSouthKoreaEM.txt";
 	std::ofstream HongKongSouthKoreafile;
 	HongKongSouthKoreafile.open(HongKongSouthKoreafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5904,11 +5904,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Hungary vs Romania
+	// Hungary vs Romania EM
 	ci1 = CountryIndex(code, "HUN");
 	ci2 = CountryIndex(code, "ROU");
 	std::string HungaryRomaniafilename;
-	HungaryRomaniafilename = "HungaryRomania.txt";
+	HungaryRomaniafilename = "HungaryRomaniaEM.txt";
 	std::ofstream HungaryRomaniafile;
 	HungaryRomaniafile.open(HungaryRomaniafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5926,11 +5926,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Indonesia vs Philippines
+	// Indonesia vs Philippines CD
 	ci1 = CountryIndex(code, "IDN");
 	ci2 = CountryIndex(code, "PHL");
 	std::string IndonesiaPhilippinesfilename;
-	IndonesiaPhilippinesfilename = "IndonesiaPhilippines.txt";
+	IndonesiaPhilippinesfilename = "IndonesiaPhilippinesCD.txt";
 	std::ofstream IndonesiaPhilippinesfile;
 	IndonesiaPhilippinesfile.open(IndonesiaPhilippinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5948,11 +5948,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Iran vs Iraq
+	// Iran vs Iraq CD
 	ci1 = CountryIndex(code, "IRN");
 	ci2 = CountryIndex(code, "IRQ");
 	std::string IranIraqfilename;
-	IranIraqfilename = "IranIraq.txt";
+	IranIraqfilename = "IranIraqCD.txt";
 	std::ofstream IranIraqfile;
 	IranIraqfile.open(IranIraqfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -5970,11 +5970,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Iraq vs Oman
+	// Iraq vs Oman CD
 	ci1 = CountryIndex(code, "IRQ");
 	ci2 = CountryIndex(code, "OMN");
 	std::string IraqOmanfilename;
-	IraqOmanfilename = "IraqOman.txt";
+	IraqOmanfilename = "IraqOmanCD.txt";
 	std::ofstream IraqOmanfile;
 	IraqOmanfile.open(IraqOmanfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6018,7 +6018,7 @@ int main()
 	ci1 = CountryIndex(code, "JAM");
 	ci2 = CountryIndex(code, "VCT");
 	std::string JamaicaSaintVincentandtheGrenadinesfilename;
-	JamaicaSaintVincentandtheGrenadinesfilename = "JamaicaSaintVincentandtheGrenadines.txt";
+	JamaicaSaintVincentandtheGrenadinesfilename = "JamaicaSaintVincentandtheGrenadinesEM.txt";
 	std::ofstream JamaicaSaintVincentandtheGrenadinesfile;
 	JamaicaSaintVincentandtheGrenadinesfile.open(JamaicaSaintVincentandtheGrenadinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6036,11 +6036,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Japan vs Malaysia
+	// Japan vs Malaysia EM
 	ci1 = CountryIndex(code, "JPN");
 	ci2 = CountryIndex(code, "MYS");
 	std::string JapanMalaysiafilename;
-	JapanMalaysiafilename = "JapanMalaysia.txt";
+	JapanMalaysiafilename = "JapanMalaysiaEM.txt";
 	std::ofstream JapanMalaysiafile;
 	JapanMalaysiafile.open(JapanMalaysiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6058,11 +6058,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Japan vs Philippines
+	// Japan vs Philippines EM
 	ci1 = CountryIndex(code, "JPN");
 	ci2 = CountryIndex(code, "PHL");
 	std::string JapanPhilippinesfilename;
-	JapanPhilippinesfilename = "JapanPhilippines.txt";
+	JapanPhilippinesfilename = "JapanPhilippinesEM.txt";
 	std::ofstream JapanPhilippinesfile;
 	JapanPhilippinesfile.open(JapanPhilippinesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6080,11 +6080,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Japan vs South Korea
+	// Japan vs South Korea EM
 	ci1 = CountryIndex(code, "JPN");
 	ci2 = CountryIndex(code, "KOR");
 	std::string JapanSouthKoreafilename;
-	JapanSouthKoreafilename = "JapanSouthKorea.txt";
+	JapanSouthKoreafilename = "JapanSouthKoreaEM.txt";
 	std::ofstream JapanSouthKoreafile;
 	JapanSouthKoreafile.open(JapanSouthKoreafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6128,7 +6128,7 @@ int main()
 	ci1 = CountryIndex(code, "KGZ");
 	ci2 = CountryIndex(code, "UZB");
 	std::string KyrgyzstanUzbekistanfilename;
-	KyrgyzstanUzbekistanfilename = "KyrgyzstanUzbekistan.txt";
+	KyrgyzstanUzbekistanfilename = "KyrgyzstanUzbekistanEM.txt";
 	std::ofstream KyrgyzstanUzbekistanfile;
 	KyrgyzstanUzbekistanfile.open(KyrgyzstanUzbekistanfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6168,11 +6168,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Latvia vs Ukraine
+	// Latvia vs Ukraine EM
 	ci1 = CountryIndex(code, "LVA");
 	ci2 = CountryIndex(code, "UKR");
 	std::string LatviaUkrainefilename;
-	LatviaUkrainefilename = "LatviaUkraine.txt";
+	LatviaUkrainefilename = "LatviaUkraineEM.txt";
 	std::ofstream LatviaUkrainefile;
 	LatviaUkrainefile.open(LatviaUkrainefilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6190,11 +6190,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Lebanon vs Palestine
+	// Lebanon vs Palestine EM
 	ci1 = CountryIndex(code, "LBN");
 	ci2 = CountryIndex(code, "PSE");
 	std::string LebanonPalestinefilename;
-	LebanonPalestinefilename = "LebanonPalestine.txt";
+	LebanonPalestinefilename = "LebanonPalestineEM.txt";
 	std::ofstream LebanonPalestinefile;
 	LebanonPalestinefile.open(LebanonPalestinefilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6212,11 +6212,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Malaysia vs Mongolia
+	// Malaysia vs Mongolia EM
 	ci1 = CountryIndex(code, "MYS");
 	ci2 = CountryIndex(code, "MNG");
 	std::string MalaysiaMongoliafilename;
-	MalaysiaMongoliafilename = "MalaysiaMongolia.txt";
+	MalaysiaMongoliafilename = "MalaysiaMongoliaEM.txt";
 	std::ofstream MalaysiaMongoliafile;
 	MalaysiaMongoliafile.open(MalaysiaMongoliafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6234,11 +6234,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Malaysia vs Taiwan
+	// Malaysia vs Taiwan EM
 	ci1 = CountryIndex(code, "MYS");
 	ci2 = CountryIndex(code, "TWN");
 	std::string MalaysiaTaiwanfilename;
-	MalaysiaTaiwanfilename = "MalaysiaTaiwan.txt";
+	MalaysiaTaiwanfilename = "MalaysiaTaiwanEM.txt";
 	std::ofstream MalaysiaTaiwanfile;
 	MalaysiaTaiwanfile.open(MalaysiaTaiwanfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6278,11 +6278,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Malaysia vs Thailand
+	// Malaysia vs Thailand EM
 	ci1 = CountryIndex(code, "MYS");
 	ci2 = CountryIndex(code, "THA");
 	std::string MalaysiaThailandfilename;
-	MalaysiaThailandfilename = "MalaysiaThailand.txt";
+	MalaysiaThailandfilename = "MalaysiaThailandEM.txt";
 	std::ofstream MalaysiaThailandfile;
 	MalaysiaThailandfile.open(MalaysiaThailandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6299,7 +6299,6 @@ int main()
 		MalaysiaThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Mauritius vs Seychelles CD
 	ci1 = CountryIndex(code, "MUS");
@@ -6323,11 +6322,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Mauritius vs Seychelles
+	// Mauritius vs Seychelles EM
 	ci1 = CountryIndex(code, "MUS");
 	ci2 = CountryIndex(code, "SYC");
 	std::string MauritiusSeychellesfilename;
-	MauritiusSeychellesfilename = "MauritiusSeychelles.txt";
+	MauritiusSeychellesfilename = "MauritiusSeychellesEM.txt";
 	std::ofstream MauritiusSeychellesfile;
 	MauritiusSeychellesfile.open(MauritiusSeychellesfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6344,7 +6343,6 @@ int main()
 		MauritiusSeychellesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
 	}
 	std::cout << ".";
-
 
 	// Mongolia vs Thailand CD
 	ci1 = CountryIndex(code, "MNG");
@@ -6368,11 +6366,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Mongolia vs Thailand
+	// Mongolia vs Thailand EM
 	ci1 = CountryIndex(code, "MNG");
 	ci2 = CountryIndex(code, "THA");
 	std::string MongoliaThailandfilename;
-	MongoliaThailandfilename = "MongoliaThailand.txt";
+	MongoliaThailandfilename = "MongoliaThailandEM.txt";
 	std::ofstream MongoliaThailandfile;
 	MongoliaThailandfile.open(MongoliaThailandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6412,11 +6410,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Philippines vs South Korea
+	// Philippines vs South Korea EM
 	ci1 = CountryIndex(code, "PHL");
 	ci2 = CountryIndex(code, "KOR");
 	std::string PhilippinesSouthKoreafilename;
-	PhilippinesSouthKoreafilename = "PhilippinesSouthKorea.txt";
+	PhilippinesSouthKoreafilename = "PhilippinesSouthKoreaEM.txt";
 	std::ofstream PhilippinesSouthKoreafile;
 	PhilippinesSouthKoreafile.open(PhilippinesSouthKoreafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6456,14 +6454,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-
-
-	// Romania vs Russia
+	// Romania vs Russia EM
 	ci1 = CountryIndex(code, "ROU");
 	ci2 = CountryIndex(code, "RUS");
 	std::string RomaniaRussiafilename;
-	RomaniaRussiafilename = "RomaniaRussia.txt";
+	RomaniaRussiafilename = "RomaniaRussiaEM.txt";
 	std::ofstream RomaniaRussiafile;
 	RomaniaRussiafile.open(RomaniaRussiafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6481,15 +6476,11 @@ int main()
 	}
 	std::cout << ".";
 
-
-
-
-
-	// Rwanda vs Uganda
+	// Rwanda vs Uganda CD
 	ci1 = CountryIndex(code, "RWA");
 	ci2 = CountryIndex(code, "UGA");
 	std::string RwandaUgandafilename;
-	RwandaUgandafilename = "RwandaUganda.txt";
+	RwandaUgandafilename = "RwandaUgandaCD.txt";
 	std::ofstream RwandaUgandafile;
 	RwandaUgandafile.open(RwandaUgandafilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6551,11 +6542,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Singapore vs Thailand
+	// Singapore vs Thailand EM
 	ci1 = CountryIndex(code, "SGP");
 	ci2 = CountryIndex(code, "THA");
 	std::string SingaporeThailandfilename;
-	SingaporeThailandfilename = "SingaporeThailand.txt";
+	SingaporeThailandfilename = "SingaporeThailandEM.txt";
 	std::ofstream SingaporeThailandfile;
 	SingaporeThailandfile.open(SingaporeThailandfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6595,11 +6586,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Thailand vs Vietnam
+	// Thailand vs Vietnam CD
 	ci1 = CountryIndex(code, "THA");
 	ci2 = CountryIndex(code, "VNM");
 	std::string ThailandVietnamfilename;
-	ThailandVietnamfilename = "ThailandVietnam.txt";
+	ThailandVietnamfilename = "ThailandVietnamCD.txt";
 	std::ofstream ThailandVietnamfile;
 	ThailandVietnamfile.open(ThailandVietnamfilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6617,11 +6608,11 @@ int main()
 	}
 	std::cout << ".";
 
-	// Zambia vs Zimbabwe
+	// Zambia vs Zimbabwe CD
 	ci1 = CountryIndex(code, "ZMB");
 	ci2 = CountryIndex(code, "ZWE");
 	std::string ZambiaZimbabwefilename;
-	ZambiaZimbabwefilename = "ZambiaZimbabwe.txt";
+	ZambiaZimbabwefilename = "ZambiaZimbabweCD.txt";
 	std::ofstream ZambiaZimbabwefile;
 	ZambiaZimbabwefile.open(ZambiaZimbabwefilename);
 	for (unsigned int d = 0; d < numdates; d++) {
@@ -6642,10 +6633,7 @@ int main()
 
 
 
-
-
 	std::string vaxdiff, cddiff, emdiff;
-
 
 	for (int c1 = 0; c1 < numentities; c1++)
 		for (int c2 = 0; c2 < numentities; c2++) {
@@ -6705,10 +6693,6 @@ int main()
 					++i;
 			}
 
-
-
-
-
 			if ((continent[c1].compare(continent[c2]) == 0) && (c1 < c2)){
 				if (v1.size() > 0)
 					vaxdiff = tostring(DTW::dtw_distance_only(v1, v2, 2));
@@ -6724,17 +6708,13 @@ int main()
 					emdiff = "nan";
 				display.push_back(continent[c1] + "\t" + entity[c1] + "\t" + entity[c2] + "\t" + vaxdiff + "\t" + cddiff + "\t" + emdiff);
 			}
-
-
 		}
 	std::cout << ".";
-
 
 	std::sort(display.begin(), display.end());
 	outputfile << "Continent" <<  "\t" << "Country1" << "\t" << "Country2" << "\t" << "vax p_norm" << "\t" << "cd p_norm" << "\t" << "em p_norm" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
-
 
 	std::cout << std::endl;
 	auto end = std::chrono::high_resolution_clock::now();
