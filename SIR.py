@@ -1,7 +1,7 @@
 # The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 # Martin Sewell
 # martin.sewell@cantab.net
-# 5 August 2024
+# 12 August 2024
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -906,14 +906,9 @@ fig18.savefig("fig18.png")
 # Vaccinations #
 ################
 
-# Vaccinations and excess mortality for Hungary and Romania
 # The excess mortality data was converted from weekly to daily using barycentric rational interpolation from the Boost C++ Libraries.
-# The end point was chosen to avoid including what looks like anomalous vaccination data for Hungary.
-
-
 
 dates = genfromtxt('dates.txt', converters = {0: date_parser})
-
 
 # LOW LOCKDOWN VS VAX
 lockdownlowvaxlow = genfromtxt('lockdownlowvaxlow.txt', delimiter='\t')
@@ -1137,8 +1132,6 @@ figLV.savefig("lockdownhighvax.png")
 
 
 
-
-
 # LOW VAX VS MASKS
 maskslowvaxlow = genfromtxt('maskslowvaxlow.txt', delimiter='\t')
 masksmedvaxlow = genfromtxt('masksmedvaxlow.txt', delimiter='\t')
@@ -1211,7 +1204,6 @@ figLV.savefig("masksmedvax.pdf")
 axLV.set_title('Excess mortality for countries with medium vaccination rates')
 figLV.savefig("masksmedvax.png")
 
-
 # HIGH VAX VS masks
 maskslowvaxhigh = genfromtxt('maskslowvaxhigh.txt', delimiter='\t')
 masksmedvaxhigh = genfromtxt('masksmedvaxhigh.txt', delimiter='\t')
@@ -1247,7 +1239,6 @@ legend.get_frame().set_alpha(1)
 figLV.savefig("maskshighvax.pdf")
 axLV.set_title('Excess mortality for countries with high vaccination rates')
 figLV.savefig("maskshighvax.png")
-
 
 # LOW COVIDDEATHS VS VAX
 coviddeathslowvaxhigh = genfromtxt('coviddeathslowvaxhigh.txt', delimiter='\t')
@@ -1321,7 +1312,6 @@ figLV.savefig("coviddeathsmedvax.pdf")
 axLV.set_title('Excess mortality for countries with a medium COVID-19 death rate')
 figLV.savefig("coviddeathsmedvax.png")
 
-
 # HIGH COVIDDEATHS VS VAX
 coviddeathshighvaxhigh = genfromtxt('coviddeathshighvaxhigh.txt', delimiter='\t')
 coviddeathshighvaxmed = genfromtxt('coviddeathshighvaxmed.txt', delimiter='\t')
@@ -1341,9 +1331,9 @@ for t, y in enumerate(em3):
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
 axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
-axLV.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Highly vaccinated countries')
-axLV.plot(dates, smooth(emm, 28), alpha=0.5, lw=2, label='Medium vaccinated countries')
-axLV.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Low vaccinated countries')
+axLV.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Highly-vaccinated countries')
+axLV.plot(dates, smooth(emm, 28), alpha=0.5, lw=2, label='Medium-vaccinated countries')
+axLV.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Low-vaccinated countries')
 axLV.set_ylabel('Excess mortality P-scores')
 axLV.xaxis.set_tick_params(length=0)
 axLV.yaxis.set_tick_params(length=0)
@@ -1354,11 +1344,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-#    axLV.spines[spine].set_visible(False)
 figLV.savefig("coviddeathshighvax.pdf")
 axLV.set_title('Excess mortality for countries with a high COVID-19 death rate')
 figLV.savefig("coviddeathshighvax.png")
-
 
 
 # COVID DEATHS VS LOCKDOWN VS VAX
@@ -1405,7 +1393,6 @@ axCDLV.set_title('COVID-19 death rate, lockdown stringency and vaccination rates
 figCDLV.savefig("coviddeathslockdownvax.png")
 
 
-
 # COVID DEATHS
 coviddeathshighcd = genfromtxt('coviddeathshighcd.txt', delimiter='\t')
 coviddeathshighem = genfromtxt('coviddeathshighem.txt', delimiter='\t')
@@ -1435,9 +1422,9 @@ ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 p1 = ax19.plot(dates, smooth(cdh, 28), alpha=0.5, lw=2, label='COVID-19 death rate for countries with a high COVID-19 death rate')
 p2 = ax19.plot(dates, smooth(cdl, 28), alpha=0.5, lw=2, label='COVID-19 death rate for countries with a low COVID-19 death rate')
-p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for countries with high COVID-19 deaths')
-p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for countries with low COVID-19 deaths')
-ax19.set_ylabel('COVID-19 deaths per million')
+p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for countries with high COVID-19 death rate')
+p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for countries with low COVID-19 death rate')
+ax19.set_ylabel('Daily COVID-19 deaths per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
 ax20.xaxis.set_tick_params(length=0)
@@ -1482,10 +1469,10 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(ldh, 28), alpha=0.5, lw=2, label='Lockdown stringency for high stringency countries')
-p2 = ax19.plot(dates, smooth(ldl, 28), alpha=0.5, lw=2, label='Lockdown stringency for low stringency countries')
-p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for for high stringency countries')
-p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low stringency countries')
+p1 = ax19.plot(dates, smooth(ldh, 28), alpha=0.5, lw=2, label='Lockdown stringency for high-stringency countries')
+p2 = ax19.plot(dates, smooth(ldl, 28), alpha=0.5, lw=2, label='Lockdown stringency for low-stringency countries')
+p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for for high-stringency countries')
+p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low-stringency countries')
 ax19.set_ylabel('Lockdown stringency')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1532,10 +1519,10 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(mh, 28), alpha=0.5, lw=2, label='Mask index for high masking countries')
-p2 = ax19.plot(dates, smooth(ml, 28), alpha=0.5, lw=2, label='Mask index for low masking countries')
-p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for high masking countries')
-p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low masking countries')
+p1 = ax19.plot(dates, smooth(mh, 28), alpha=0.5, lw=2, label='Mask index for high-masking countries')
+p2 = ax19.plot(dates, smooth(ml, 28), alpha=0.5, lw=2, label='Mask index for low-masking countries')
+p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for high-masking countries')
+p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low-masking countries')
 ax19.set_ylabel('Face covering policies index')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1554,12 +1541,7 @@ ax19.set_title('Face masks')
 fig19.savefig("masks.png")
 
 
-
-
-
-
-
-# Vax and COVID-19 deaths
+# Vax and COVID-19 death rate
 vaxhighcd = genfromtxt('vaxhighcd.txt', delimiter='\t')
 vaxhighvx = genfromtxt('vaxhighvx.txt', delimiter='\t')
 vaxmedcd = genfromtxt('vaxmedcd.txt', delimiter='\t')
@@ -1594,14 +1576,14 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly vaccinated countries')
-p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium vaccinated countries')
-p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low vaccinated countries')
-p4 = ax20.plot(dates, smooth(cdh, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for highly vaccinated countries')
-p5 = ax20.plot(dates, smooth(cdm, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for medium vaccinated countries')
-p6 = ax20.plot(dates, smooth(cdl, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for low vaccinated countries')
+p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
+p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
+p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
+p4 = ax20.plot(dates, smooth(cdh, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for highly-vaccinated countries')
+p5 = ax20.plot(dates, smooth(cdm, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for medium-vaccinated countries')
+p6 = ax20.plot(dates, smooth(cdl, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for low-vaccinated countries')
 ax19.set_ylabel('Vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax20.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1639,40 +1621,40 @@ for c, d in enumerate(numclust):
             cd1[:] = np.nan
             for t, y in enumerate(cd1):
                 cd1[t] = np.nanmean(vaxhighvx[t], axis=0)
-            p1 = ax19.plot(dates, smooth(cd1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly vaccinated countries') # Vaccination rate in highly vaccinated countries
+            p1 = ax19.plot(dates, smooth(cd1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
         if vaxmedvx.size > 0:
             cd2 = np.empty(len(dates))
             cd2[:] = np.nan
             for t, y in enumerate(cd2):
                 cd2[t] = np.nanmean(vaxmedvx[t], axis=0)
-            p2 = ax19.plot(dates, smooth(cd2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium vaccinated countries') # Vaccination rate in medium vaccinated countries
+            p2 = ax19.plot(dates, smooth(cd2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
         if vaxlowvx.size > 0:
             cd3 = np.empty(len(dates))
             cd3[:] = np.nan
             for t, y in enumerate(cd3):
                 cd3[t] = np.nanmean(vaxlowvx[t], axis=0)
-            p3 = ax19.plot(dates, smooth(cd3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low vaccinated countries') # Vaccination rate in low vaccinated countries
+            p3 = ax19.plot(dates, smooth(cd3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
         if vaxhighcd.size > 0:
             cd4 = np.empty(len(dates))
             cd4[:] = np.nan
             for t, y in enumerate(cd4):
                 cd4[t] = np.nanmean(vaxhighcd[t], axis=0)
-            p4 = ax20.plot(dates, smooth(cd4, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for highly vaccinated countries') # COVID-19 deaths for highly vaccinated countries
+            p4 = ax20.plot(dates, smooth(cd4, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for highly-vaccinated countries') # COVID-19 deaths for highly vaccinated countries
         if vaxmedcd.size > 0:
             cd5 = np.empty(len(dates))
             cd5[:] = np.nan
             for t, y in enumerate(cd5):
                 cd5[t] = np.nanmean(vaxmedcd[t], axis=0)
-            p5 = ax20.plot(dates, smooth(cd5, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for medium vaccinated countries') # COVID-19 deaths for medium vaccinated countries
+            p5 = ax20.plot(dates, smooth(cd5, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for medium-vaccinated countries') # COVID-19 deaths for medium vaccinated countries
         if vaxlowcd.size > 0:
             cd6 = np.empty(len(dates))
             cd6[:] = np.nan
             for t, y in enumerate(cd6):
                 cd6[t] = np.nanmean(vaxlowcd[t], axis=0)
-            p6 = ax20.plot(dates, smooth(cd6, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for low vaccinated countries') # COVID-19 deaths for low vaccinated countries
+            p6 = ax20.plot(dates, smooth(cd6, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for low-vaccinated countries') # COVID-19 deaths for low vaccinated countries
         if (vaxhighvx.size > 0 or vaxmedvx.size > 0 or vaxlowvx.size > 0 or vaxhighcd.size > 0 or vaxmedcd.size > 0 or vaxlowcd.size > 0):
             ax19.set_ylabel('Vaccination doses per million')
-            ax20.set_ylabel('COVID-19 deaths')
+            ax20.set_ylabel('COVID-19 deaths per million')
             ax19.yaxis.set_tick_params(length=0)
             ax20.xaxis.set_tick_params(length=0)
             ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1706,40 +1688,40 @@ for c, d in enumerate(numclust):
             em1[:] = np.nan
             for t, y in enumerate(em1):
                 em1[t] = np.nanmean(vaxhighvx[t], axis=0)
-            p1 = ax19.plot(dates, smooth(em1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly vaccinated countries') # Vaccination rate in highly vaccinated countries
+            p1 = ax19.plot(dates, smooth(em1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
         if vaxmedvx.size > 0:
             em2 = np.empty(len(dates))
             em2[:] = np.nan
             for t, y in enumerate(em2):
                 em2[t] = np.nanmean(vaxmedvx[t], axis=0)
-            p2 = ax19.plot(dates, smooth(em2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium vaccinated countries') # Vaccination rate in medium vaccinated countries
+            p2 = ax19.plot(dates, smooth(em2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
         if vaxlowvx.size > 0:
             em3 = np.empty(len(dates))
             em3[:] = np.nan
             for t, y in enumerate(em3):
                 em3[t] = np.nanmean(vaxlowvx[t], axis=0)
-            p3 = ax19.plot(dates, smooth(em3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low vaccinated countries') # Vaccination rate in low vaccinated countries
+            p3 = ax19.plot(dates, smooth(em3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
         if vaxhighem.size > 0:
             em4 = np.empty(len(dates))
             em4[:] = np.nan
             for t, y in enumerate(em4):
                 em4[t] = np.nanmean(vaxhighem[t], axis=0)
-            p4 = ax20.plot(dates, smooth(em4, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly vaccinated countries') # Excess mortality for highly vaccinated countries
+            p4 = ax20.plot(dates, smooth(em4, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly-vaccinated countries') # Excess mortality for highly vaccinated countries
         if vaxmedem.size > 0:
             em5 = np.empty(len(dates))
             em5[:] = np.nan
             for t, y in enumerate(em5):
                 em5[t] = np.nanmean(vaxmedem[t], axis=0)
-            p5 = ax20.plot(dates, smooth(em5, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium vaccinated countries') # Excess mortality for medium vaccinated countries
+            p5 = ax20.plot(dates, smooth(em5, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium-vaccinated countries') # Excess mortality for medium vaccinated countries
         if vaxlowem.size > 0:
             em6 = np.empty(len(dates))
             em6[:] = np.nan
             for t, y in enumerate(em6):
                 em6[t] = np.nanmean(vaxlowem[t], axis=0)
-            p6 = ax20.plot(dates, smooth(em6, 28*2), alpha=0.5, lw=2, label='Excess mortality for low vaccinated countries') # Excess mortality for low vaccinated countries
+            p6 = ax20.plot(dates, smooth(em6, 28*2), alpha=0.5, lw=2, label='Excess mortality for low-vaccinated countries') # Excess mortality for low vaccinated countries
         if (vaxhighvx.size > 0 or vaxmedvx.size > 0 or vaxlowvx.size > 0 or vaxhighcd.size > 0 or vaxmedcd.size > 0 or vaxlowcd.size > 0):
             ax19.set_ylabel('Vaccination doses per million')
-            ax20.set_ylabel('COVID-19 deaths')
+            ax20.set_ylabel('COVID-19 deaths per million')
             ax19.yaxis.set_tick_params(length=0)
             ax20.xaxis.set_tick_params(length=0)
             ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1793,12 +1775,12 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly vaccinated countries')
-p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium vaccinated countries')
-p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low vaccinated countries')
-p4 = ax20.plot(dates, smooth(emh, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly vaccinated countries')
-p5 = ax20.plot(dates, smooth(emm, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium vaccinated countries')
-p6 = ax20.plot(dates, smooth(eml, 28*2), alpha=0.5, lw=2, label='Excess mortality for low vaccinated countries')
+p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
+p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
+p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
+p4 = ax20.plot(dates, smooth(emh, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly-vaccinated countries')
+p5 = ax20.plot(dates, smooth(emm, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium-vaccinated countries')
+p6 = ax20.plot(dates, smooth(eml, 28*2), alpha=0.5, lw=2, label='Excess mortality for low-vaccinated countries')
 ax19.set_ylabel('Vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1826,7 +1808,7 @@ for i, c in enumerate(countries):
     CNTRYdata = genfromtxt(cf + '.txt', delimiter='\t', converters = {0: date_parser})
     dates = [row[0] for row in CNTRYdata]
     CNTRYlockdown = [row[1] for row in CNTRYdata]
-    CNTRYmasks = [row[2] for row in CNTRYdata]    
+    CNTRYmasks = [row[2] for row in CNTRYdata]
     CNTRYvax = [row[3] for row in CNTRYdata]
     CNTRYcoviddeaths = [row[4] for row in CNTRYdata]
     CNTRYexcessmortality = [row[5] for row in CNTRYdata]
@@ -1945,20 +1927,20 @@ fig19.savefig("SWEGBR.png")
 # PAIRS OF COUNTRIES #
 ######################
 
-vaxdata = genfromtxt('AlgeriaEgyptCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DZAEGYdata = genfromtxt('AlgeriaEgyptCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DZAEGYdata]
+vax_DZA = [row[1] for row in DZAEGYdata]
+vax_EGY = [row[2] for row in DZAEGYdata]
+deaths_DZA = [row[3] for row in DZAEGYdata]
+deaths_EGY = [row[4] for row in DZAEGYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Egypt excess mortality')
+EGYv = ax19.plot(dates, smooth(vax_EGY, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
+DZAcd = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda COVID-19 death rate')
+EGYcd = ax20.plot(dates, smooth(deaths_EGY, 28), alpha=0.5, lw=2, label='Egypt COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1973,24 +1955,24 @@ lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
 fig19.savefig("AlgeriaEgyptCD.pdf")
-ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and Egypt')
+ax19.set_title('Vaccinations and COVID-19 deaths for Antigua and Barbuda and Egypt')
 fig19.savefig("AlgeriaEgyptCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('AlgeriaEgypt.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DZAEGYdata = genfromtxt('AlgeriaEgyptEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DZAEGYdata]
+vax_DZA = [row[1] for row in DZAEGYdata]
+vax_EGY = [row[2] for row in DZAEGYdata]
+deaths_DZA = [row[3] for row in DZAEGYdata]
+deaths_EGY = [row[4] for row in DZAEGYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
+EGYv = ax19.plot(dates, smooth(vax_EGY, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
 DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Egypt excess mortality')
+EGYem = ax20.plot(dates, smooth(deaths_EGY, 28), alpha=0.5, lw=2, label='Egypt excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2004,25 +1986,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("AlgeriaEgypt.pdf")
+fig19.savefig("AlgeriaEgyptEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and Egypt')
-fig19.savefig("AlgeriaEgypt.png")
+fig19.savefig("AlgeriaEgyptEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('AntiguaandBarbudaCuba.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+ATGCUBdata = genfromtxt('AntiguaandBarbudaCubaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ATGCUBdata]
+vax_ATG = [row[1] for row in ATGCUBdata]
+vax_CUB = [row[2] for row in ATGCUBdata]
+deaths_ATG = [row[3] for row in ATGCUBdata]
+deaths_CUB = [row[4] for row in ATGCUBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
+ATGv = ax19.plot(dates, smooth(vax_ATG, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
+CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
+ATGem = ax20.plot(dates, smooth(deaths_ATG, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
+CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2036,25 +2018,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("AntiguaandBarbudaCuba.pdf")
+fig19.savefig("AntiguaandBarbudaCubaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and Cuba')
-fig19.savefig("AntiguaandBarbudaCuba.png")
+fig19.savefig("AntiguaandBarbudaCubaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('ArgentinaParaguay.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+ARGPRYdata = genfromtxt('ArgentinaParaguayEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ARGPRYdata]
+vax_ARG = [row[1] for row in ARGPRYdata]
+vax_PRY = [row[2] for row in ARGPRYdata]
+deaths_ARG = [row[3] for row in ARGPRYdata]
+deaths_PRY = [row[4] for row in ARGPRYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Argentina vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Paraguay vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Argentina excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Paraguay excess mortality')
+ARGv = ax19.plot(dates, smooth(vax_ARG, 28), alpha=0.5, lw=2, label='Argentina vaccination rate')
+PRYv = ax19.plot(dates, smooth(vax_PRY, 28), alpha=0.5, lw=2, label='Paraguay vaccination rate')
+ARGem = ax20.plot(dates, smooth(deaths_ARG, 28), alpha=0.5, lw=2, label='Argentina excess mortality')
+PRYem = ax20.plot(dates, smooth(deaths_PRY, 28), alpha=0.5, lw=2, label='Paraguay excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2068,91 +2050,91 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("ArgentinaParaguay.pdf")
+fig19.savefig("ArgentinaParaguayEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Argentina and Paraguay')
-fig19.savefig("ArgentinaParaguay.png")
+fig19.savefig("ArgentinaParaguayEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('ArmeniaAzerbaijanCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_ARM = [row[1] for row in vaxdata]
-vax_AZE = [row[2] for row in vaxdata]
-deaths_ARM = [row[3] for row in vaxdata]
-deaths_AZE = [row[4] for row in vaxdata]
-fig29 = plt.figure(facecolor='w')
-ax29 = fig29.add_subplot(111, axisbelow=True)
-ax30 = ax29.twinx()
-ax30._get_lines.prop_cycler = ax29._get_lines.prop_cycler
-ARMv = ax29.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
-AZEv = ax29.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
-ARMem = ax30.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia COVID-19 deaths')
-AZEem = ax30.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Azerbaijan COVID-19 deaths')
-ax29.set_ylabel('Daily vaccination doses per million')
-ax30.set_ylabel('Excess mortality P-scores')
-ax29.yaxis.set_tick_params(length=0)
-ax29.xaxis.set_tick_params(length=0)
-ax29.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax29.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-ax29.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-fig29.autofmt_xdate()
-ax29.grid(visible=True)
-legend.get_frame().set_alpha(1)
-lines, labels = ax29.get_legend_handles_labels()
-lines2, labels2 = ax30.get_legend_handles_labels()
-plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig29.savefig("ArmeniaAzerbaijanCD.pdf")
-ax29.set_title('Vaccinations and COVID-19 deaths for Armenia and Azerbaijan')
-fig29.savefig("ArmeniaAzerbaijanCD.png")
-plt.close('all')
-
-vaxdata = genfromtxt('ArmeniaAzerbaijan.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_ARM = [row[1] for row in vaxdata]
-vax_AZE = [row[2] for row in vaxdata]
-deaths_ARM = [row[3] for row in vaxdata]
-deaths_AZE = [row[4] for row in vaxdata]
-fig29 = plt.figure(facecolor='w')
-ax29 = fig29.add_subplot(111, axisbelow=True)
-ax30 = ax29.twinx()
-ax30._get_lines.prop_cycler = ax29._get_lines.prop_cycler
-ARMv = ax29.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
-AZEv = ax29.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
-ARMem = ax30.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia excess mortality')
-AZEem = ax30.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Azerbaijan excess mortality')
-ax29.set_ylabel('Daily vaccination doses per million')
-ax30.set_ylabel('Excess mortality P-scores')
-ax29.yaxis.set_tick_params(length=0)
-ax29.xaxis.set_tick_params(length=0)
-ax29.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax29.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-ax29.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-fig29.autofmt_xdate()
-ax29.grid(visible=True)
-legend.get_frame().set_alpha(1)
-lines, labels = ax19.get_legend_handles_labels()
-lines2, labels2 = ax20.get_legend_handles_labels()
-plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig29.savefig("ArmeniaAzerbaijan.pdf")
-ax29.set_title('Vaccinations and excess mortality for Armenia and Azerbaijan')
-fig29.savefig("ArmeniaAzerbaijan.png")
-plt.close('all')
-
-vaxdata = genfromtxt('AustraliaNewZealandCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+ARMAZEdata = genfromtxt('ArmeniaAzerbaijanCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ARMAZEdata]
+vax_ARM = [row[1] for row in ARMAZEdata]
+vax_AZE = [row[2] for row in ARMAZEdata]
+deaths_ARM = [row[3] for row in ARMAZEdata]
+deaths_AZE = [row[4] for row in ARMAZEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Australia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='New Zealand COVID-19 deaths')
+ARMv = ax19.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
+AZEv = ax19.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
+ARMcd = ax20.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia COVID-19 death rate')
+AZEcd = ax20.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Azerbaijan COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Excess mortality P-scores')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("ArmeniaAzerbaijanCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Armenia and Azerbaijan')
+fig19.savefig("ArmeniaAzerbaijanCD.png")
+plt.close('all')
+
+ARMAZEdata = genfromtxt('ArmeniaAzerbaijanEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ARMAZEdata]
+vax_ARM = [row[1] for row in ARMAZEdata]
+vax_AZE = [row[2] for row in ARMAZEdata]
+deaths_ARM = [row[3] for row in ARMAZEdata]
+deaths_AZE = [row[4] for row in ARMAZEdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+ARMv = ax19.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
+AZEv = ax19.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
+ARMem = ax20.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia excess mortality')
+AZEem = ax20.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Azerbaijan excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Excess mortality P-scores')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("ArmeniaAzerbaijanEM.pdf")
+ax19.set_title('Vaccinations and excess mortality for Armenia and Azerbaijan')
+fig19.savefig("ArmeniaAzerbaijanEM.png")
+plt.close('all')
+
+AUSNZLdata = genfromtxt('AustraliaNewZealandCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in AUSNZLdata]
+vax_AUS = [row[1] for row in AUSNZLdata]
+vax_NZL = [row[2] for row in AUSNZLdata]
+deaths_AUS = [row[3] for row in AUSNZLdata]
+deaths_NZL = [row[4] for row in AUSNZLdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+AUSv = ax19.plot(dates, smooth(vax_AUS, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
+NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
+AUScd = ax20.plot(dates, smooth(deaths_AUS, 28), alpha=0.5, lw=2, label='Australia COVID-19 death rate')
+NZLcd = ax20.plot(dates, smooth(deaths_NZL, 28), alpha=0.5, lw=2, label='New Zealand COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 death rate')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2169,20 +2151,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Australia and New Zealand')
 fig19.savefig("AustraliaNewZealandCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('AustraliaNewZealand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+AUSNZLdata = genfromtxt('AustraliaNewZealandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in AUSNZLdata]
+vax_AUS = [row[1] for row in AUSNZLdata]
+vax_NZL = [row[2] for row in AUSNZLdata]
+deaths_AUS = [row[3] for row in AUSNZLdata]
+deaths_NZL = [row[4] for row in AUSNZLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Australia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='New Zealand excess mortality')
+AUSv = ax19.plot(dates, smooth(vax_AUS, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
+NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
+AUSem = ax20.plot(dates, smooth(deaths_AUS, 28), alpha=0.5, lw=2, label='Australia excess mortality')
+NZLem = ax20.plot(dates, smooth(deaths_NZL, 28), alpha=0.5, lw=2, label='New Zealand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2196,27 +2178,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("AustraliaNewZealand.pdf")
+fig19.savefig("AustraliaNewZealandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Australia and New Zealand')
-fig19.savefig("AustraliaNewZealand.png")
+fig19.savefig("AustraliaNewZealandEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BelarusDenmarkCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BLRDNKdata = genfromtxt('BelarusDenmarkCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BLRDNKdata]
+vax_BLR = [row[1] for row in BLRDNKdata]
+vax_DNK = [row[2] for row in BLRDNKdata]
+deaths_BLR = [row[3] for row in BLRDNKdata]
+deaths_DNK = [row[4] for row in BLRDNKdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Belarus COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Denmark COVID-19 deaths')
+BLRv = ax19.plot(dates, smooth(vax_BLR, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+BLRcd = ax20.plot(dates, smooth(deaths_BLR, 28), alpha=0.5, lw=2, label='Belarus COVID-19 death rate')
+DNKcd = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2233,20 +2215,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Belarus and Denmark')
 fig19.savefig("BelarusDenmarkCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BelarusDenmark.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BLRDNKdata = genfromtxt('BelarusDenmarkEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BLRDNKdata]
+vax_BLR = [row[1] for row in BLRDNKdata]
+vax_DNK = [row[2] for row in BLRDNKdata]
+deaths_BLR = [row[3] for row in BLRDNKdata]
+deaths_DNK = [row[4] for row in BLRDNKdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Belarus excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
+BLRv = ax19.plot(dates, smooth(vax_BLR, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+BLRem = ax20.plot(dates, smooth(deaths_BLR, 28), alpha=0.5, lw=2, label='Belarus excess mortality')
+DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2260,27 +2242,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("BelarusDenmark.pdf")
+fig19.savefig("BelarusDenmarkEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Belarus and Denmark')
-fig19.savefig("BelarusDenmark.png")
+fig19.savefig("BelarusDenmarkEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BhutanSingaporeCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BTNSGPdata = genfromtxt('BhutanSingaporeCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BTNSGPdata]
+vax_BTN = [row[1] for row in BTNSGPdata]
+vax_SGP = [row[2] for row in BTNSGPdata]
+deaths_BTN = [row[3] for row in BTNSGPdata]
+deaths_SGP = [row[4] for row in BTNSGPdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Singapore COVID-19 deaths')
+BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
+SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
+BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
+SGPcd = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2297,22 +2279,22 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Bhutan and Singapore')
 fig19.savefig("BhutanSingaporeCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BhutanVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BTNVNMdata = genfromtxt('BhutanVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BTNVNMdata]
+vax_BTN = [row[1] for row in BTNVNMdata]
+vax_VNM = [row[2] for row in BTNVNMdata]
+deaths_BTN = [row[3] for row in BTNVNMdata]
+deaths_VNM = [row[4] for row in BTNVNMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Vietnam COVID-19 deaths')
+BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
+VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
+BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
+VNMcd = ax20.plot(dates, smooth(deaths_VNM, 28), alpha=0.5, lw=2, label='Vietnam COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2329,20 +2311,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Bhutan and Vietnam')
 fig19.savefig("BhutanVietnamCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BhutanSingapore.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BTNSGPdata = genfromtxt('BhutanSingaporeEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BTNSGPdata]
+vax_BTN = [row[1] for row in BTNSGPdata]
+vax_SGP = [row[2] for row in BTNSGPdata]
+deaths_BTN = [row[3] for row in BTNSGPdata]
+deaths_SGP = [row[4] for row in BTNSGPdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Singapore excess mortality')
+BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
+SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
+BTNem = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
+SGPem = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2356,27 +2338,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("BhutanSingapore.pdf")
+fig19.savefig("BhutanSingaporeEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Bhutan and Singapore')
-fig19.savefig("BhutanSingapore.png")
+fig19.savefig("BhutanSingaporeEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BhutanThailandCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BTNTHAdata = genfromtxt('BhutanThailandCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BTNTHAdata]
+vax_BTN = [row[1] for row in BTNTHAdata]
+vax_THA = [row[2] for row in BTNTHAdata]
+deaths_BTN = [row[3] for row in BTNTHAdata]
+deaths_THA = [row[4] for row in BTNTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand COVID-19 deaths')
+BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
+THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2393,20 +2375,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Bhutan and Thailand')
 fig19.savefig("BhutanThailandCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BhutanThailand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BTNTHAdata = genfromtxt('BhutanThailandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BTNTHAdata]
+vax_BTN = [row[1] for row in BTNTHAdata]
+vax_THA = [row[2] for row in BTNTHAdata]
+deaths_BTN = [row[3] for row in BTNTHAdata]
+deaths_THA = [row[4] for row in BTNTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
+BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+BTNem = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
+THAem = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2420,25 +2402,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("BhutanThailand.pdf")
+fig19.savefig("BhutanThailandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Bhutan and Thailand')
-fig19.savefig("BhutanThailand.png")
+fig19.savefig("BhutanThailandEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BosniaandHerzegovinaRomania.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BIHROUdata = genfromtxt('BosniaandHerzegovinaRomaniaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BIHROUdata]
+vax_BIH = [row[1] for row in BIHROUdata]
+vax_ROU = [row[2] for row in BIHROUdata]
+deaths_BIH = [row[3] for row in BIHROUdata]
+deaths_ROU = [row[4] for row in BIHROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Romania excess mortality')
+BIHv = ax19.plot(dates, smooth(vax_BIH, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina vaccination rate')
+ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
+BIHem = ax20.plot(dates, smooth(deaths_BIH, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina excess mortality')
+ROUem = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2452,17 +2434,17 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("BosniaandHerzegovinaRomania.pdf")
+fig19.savefig("BosniaandHerzegovinaRomaniaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Bosnia and Herzegovina and Romania')
-fig19.savefig("BosniaandHerzegovinaRomania.png")
+fig19.savefig("BosniaandHerzegovinaRomaniaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BulgariaSerbia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_BGR = [row[1] for row in vaxdata]
-vax_SRB = [row[2] for row in vaxdata]
-deaths_BGR = [row[3] for row in vaxdata]
-deaths_SRB = [row[4] for row in vaxdata]
+BGRSRBdata = genfromtxt('BulgariaSerbiaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BGRSRBdata]
+vax_BGR = [row[1] for row in BGRSRBdata]
+vax_SRB = [row[2] for row in BGRSRBdata]
+deaths_BGR = [row[3] for row in BGRSRBdata]
+deaths_SRB = [row[4] for row in BGRSRBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
@@ -2484,59 +2466,59 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("BulgariaSerbia.pdf")
+fig19.savefig("BulgariaSerbiaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Bulgaria and Serbia')
-fig19.savefig("BulgariaSerbia.png")
+fig19.savefig("BulgariaSerbiaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('BurundiEritreaCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_ARM = [row[1] for row in vaxdata]
-vax_AZE = [row[2] for row in vaxdata]
-deaths_ARM = [row[3] for row in vaxdata]
-deaths_AZE = [row[4] for row in vaxdata]
-fig29 = plt.figure(facecolor='w')
-ax29 = fig29.add_subplot(111, axisbelow=True)
-ax30 = ax29.twinx()
-ax30._get_lines.prop_cycler = ax29._get_lines.prop_cycler
-ARMv = ax29.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
-AZEv = ax29.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Eritrea vaccination rate')
-ARMem = ax30.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Burundi excess mortality')
-AZEem = ax30.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Eritrea excess mortality')
-ax29.set_ylabel('Daily vaccination doses per million')
-ax30.set_ylabel('Excess mortality P-scores')
-ax29.yaxis.set_tick_params(length=0)
-ax29.xaxis.set_tick_params(length=0)
-ax29.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax29.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-ax29.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-fig29.autofmt_xdate()
-ax29.grid(visible=True)
-legend.get_frame().set_alpha(1)
-lines, labels = ax19.get_legend_handles_labels()
-lines2, labels2 = ax20.get_legend_handles_labels()
-plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig29.savefig("BurundiEritreaCD.pdf")
-ax29.set_title('Vaccinations and excess mortality for Burundi and Eritrea')
-fig29.savefig("BurundiEritreaCD.png")
-plt.close('all')
-
-vaxdata = genfromtxt('BurundiSeychellesCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+BDIERIdata = genfromtxt('BurundiEritreaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BDIERIdata]
+vax_BDI = [row[1] for row in BDIERIdata]
+vax_ERI = [row[2] for row in BDIERIdata]
+deaths_BDI = [row[3] for row in BDIERIdata]
+deaths_ERI = [row[4] for row in BDIERIdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Burundi COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 deaths')
+BDIv = ax19.plot(dates, smooth(vax_BDI, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
+ERIv = ax19.plot(dates, smooth(vax_ERI, 28) , alpha=0.5, lw=2, label='Eritrea vaccination rate')
+BDIcd = ax20.plot(dates, smooth(deaths_BDI, 28), alpha=0.5, lw=2, label='Burundi COVID-19 death rate')
+ERIcd = ax20.plot(dates, smooth(deaths_ERI, 28), alpha=0.5, lw=2, label='Eritrea COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("BurundiEritreaCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Burundi and Eritrea')
+fig19.savefig("BurundiEritreaCD.png")
+plt.close('all')
+
+BDISYCdata = genfromtxt('BurundiSeychellesCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in BDISYCdata]
+vax_BDI = [row[1] for row in BDISYCdata]
+vax_SYC = [row[2] for row in BDISYCdata]
+deaths_BDI = [row[3] for row in BDISYCdata]
+deaths_SYC = [row[4] for row in BDISYCdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+BDIv = ax19.plot(dates, smooth(vax_BDI, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
+SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
+BDIcd = ax20.plot(dates, smooth(deaths_BDI, 28), alpha=0.5, lw=2, label='Burundi COVID-19 death rate')
+SYCcd = ax20.plot(dates, smooth(deaths_SYC, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2553,22 +2535,22 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Burundi and Seychelles')
 fig19.savefig("BurundiSeychellesCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CambodiaVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+KHMVNMdata = genfromtxt('CambodiaVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in KHMVNMdata]
+vax_KHM = [row[1] for row in KHMVNMdata]
+vax_VNM = [row[2] for row in KHMVNMdata]
+deaths_KHM = [row[3] for row in KHMVNMdata]
+deaths_VNM = [row[4] for row in KHMVNMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Cambodia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Cambodia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Vietnam COVID-19 deaths')
+KHMv = ax19.plot(dates, smooth(vax_KHM, 28), alpha=0.5, lw=2, label='Cambodia vaccination rate')
+VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
+KHMcd = ax20.plot(dates, smooth(deaths_KHM, 28), alpha=0.5, lw=2, label='Cambodia COVID-19 death rate')
+VNMcd = ax20.plot(dates, smooth(deaths_VNM, 28), alpha=0.5, lw=2, label='Vietnam COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -2585,21 +2567,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Cambodia and Vietnam')
 fig19.savefig("CambodiaVietnamCD.png")
 plt.close('all')
 
-
-vaxdata = genfromtxt('CanadaCuba.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+CANCUBdata = genfromtxt('CanadaCubaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CANCUBdata]
+vax_CAN = [row[1] for row in CANCUBdata]
+vax_CUB = [row[2] for row in CANCUBdata]
+deaths_CAN = [row[3] for row in CANCUBdata]
+deaths_CUB = [row[4] for row in CANCUBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Canada excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
+CANv = ax19.plot(dates, smooth(vax_CAN, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
+CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
+CANem = ax20.plot(dates, smooth(deaths_CAN, 28), alpha=0.5, lw=2, label='Canada excess mortality')
+CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2613,26 +2594,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CanadaCuba.pdf")
+fig19.savefig("CanadaCubaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Canada and Cuba')
-fig19.savefig("CanadaCuba.png")
+fig19.savefig("CanadaCubaEM.png")
 plt.close('all')
 
-
-vaxdata = genfromtxt('CanadaSaintVincentandtheGrenadines.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+CANVCTdata = genfromtxt('CanadaSaintVincentandtheGrenadinesEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CANVCTdata]
+vax_CAN = [row[1] for row in CANVCTdata]
+vax_VCT = [row[2] for row in CANVCTdata]
+deaths_CAN = [row[3] for row in CANVCTdata]
+deaths_VCT = [row[4] for row in CANVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Canada excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines excess mortality')
+CANv = ax19.plot(dates, smooth(vax_CAN, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
+VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
+CANem = ax20.plot(dates, smooth(deaths_CAN, 28), alpha=0.5, lw=2, label='Canada excess mortality')
+VCTem = ax20.plot(dates, smooth(deaths_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2646,25 +2626,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CanadaSaintVincentandtheGrenadines.pdf")
+fig19.savefig("CanadaSaintVincentandtheGrenadinesEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Canada and Saint Vincent and the Grenadines')
-fig19.savefig("CanadaSaintVincentandtheGrenadines.png")
+fig19.savefig("CanadaSaintVincentandtheGrenadinesEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CapeVerdeTunisia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+CPVTUNdata = genfromtxt('CapeVerdeTunisiaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CPVTUNdata]
+vax_CPV = [row[1] for row in CPVTUNdata]
+vax_TUN = [row[2] for row in CPVTUNdata]
+deaths_CPV = [row[3] for row in CPVTUNdata]
+deaths_TUN = [row[4] for row in CPVTUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Cape Verde vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Tunisia vaccination rate')
-DZAem = ax20.plot(dates, deaths_DZA, alpha=0.5, lw=2, label='Cape Verde excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Tunisia excess mortality')
+CPVv = ax19.plot(dates, smooth(vax_CPV, 28), alpha=0.5, lw=2, label='Cape Verde vaccination rate')
+TUNv = ax19.plot(dates, smooth(vax_TUN, 28), alpha=0.5, lw=2, label='Tunisia vaccination rate')
+CPVem = ax20.plot(dates, smooth(deaths_CPV, 28), alpha=0.5, lw=2, label='Cape Verde excess mortality')
+TUNem = ax20.plot(dates, smooth(deaths_TUN, 28), alpha=0.5, lw=2, label='Tunisia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2678,33 +2658,34 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CapeVerdeTunisia.pdf")
+fig19.savefig("CapeVerdeTunisiaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Cape Verde and Tunisia')
-fig19.savefig("CapeVerdeTunisia.png")
+fig19.savefig("CapeVerdeTunisiaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HRVHUNdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+deaths_HRVs = smooth(deaths_HRV, 7)
+deaths_HUNs = smooth(deaths_HUN, 7)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary COVID-19 deaths')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVcd = ax20.plot(dates, smooth(deaths_HRVs, 28), alpha=0.5, lw=2, label='Croatia COVID-19 death rate')
+HUNcd = ax20.plot(dates, smooth(deaths_HUNs, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
@@ -2716,55 +2697,93 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Croatia and Hungary')
 fig19.savefig("CroatiaHungaryCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-vax_diff = np.subtract(vax_PRT, vax_DZA)
-deaths_PRT = [row[4] for row in vaxdata]
-deaths_diff = np.subtract(deaths_PRT, deaths_DZA)
+HRVHUNdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+deaths_HRVs = smooth(deaths_HRV, 7)
+deaths_HUNs = smooth(deaths_HUN, 7)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='C - H vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='C - H COVID-19 deaths')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVcd = ax20.plot(dates, smooth(deaths_HRVs, 28), alpha=0.5, lw=2, label='Croatia COVID-19 death rate')
+HUNcd = ax20.plot(dates, smooth(deaths_HUNs, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)]) # zoom in on this period
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungaryCDdiff.pdf")
+fig19.savefig("CroatiaHungaryCDz.pdf")
 ax19.set_title('Vaccinations and COVID-19 deaths for Croatia and Hungary')
-fig19.savefig("CroatiaHungaryCDdiff.png")
+fig19.savefig("CroatiaHungaryCDz.png")
 plt.close('all')
 
 
 
-# all ages
-vaxdata = genfromtxt('CroatiaHungary.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HRVHUNdata = genfromtxt('CroatiaHungaryCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+deaths_HRVs = smooth(deaths_HRV, 7)
+deaths_HUNs = smooth(deaths_HUN, 7)
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUNs, deaths_HRVs)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate minus Croatia COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungaryCDdiffz.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungaryCDdiffz.png")
+plt.close('all')
+
+# all ages
+HRVHUNdata = genfromtxt('CroatiaHungaryEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
 ax20.set_ylabel('Excess mortality P-scores (all ages)')
 ax19.yaxis.set_tick_params(length=0)
@@ -2772,39 +2791,74 @@ ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary.pdf")
+fig19.savefig("CroatiaHungaryEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Croatia and Hungary')
-fig19.savefig("CroatiaHungary.png")
+fig19.savefig("CroatiaHungaryEM.png")
 plt.close('all')
 
-# _0_14
-vaxdata = genfromtxt('CroatiaHungary_0_14.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+
+
+
+# all ages
+HRVHUNdata = genfromtxt('CroatiaHungaryEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel('Excess mortality P-scores (all ages)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)]) # zoom in on this period
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungaryEMz.pdf")
+ax19.set_title('Vaccinations and excess mortality for Croatia and Hungary')
+fig19.savefig("CroatiaHungaryEMz.png")
+plt.close('all')
+
+# _0_14
+HRVHUNdata = genfromtxt('CroatiaHungary_0_14EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
 ax20.set_ylabel(r'Excess mortality P-scores (ages 0--14)')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
 fig19.autofmt_xdate()
@@ -2813,26 +2867,99 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary_0_14.pdf")
+fig19.savefig("CroatiaHungary_0_14EM.pdf")
 ax19.set_title(r'Vaccinations and excess mortality for ages 0--14 for Croatia and Hungary')
-fig19.savefig("CroatiaHungary_0_14.png")
+fig19.savefig("CroatiaHungary_0_14EM.png")
 plt.close('all')
 
-# _15_64
-vaxdata = genfromtxt('CroatiaHungary_15_64.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+# _0_14 z
+HRVHUNdata = genfromtxt('CroatiaHungary_0_14EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 0--14)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_0_14EMz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 0--14 for Croatia and Hungary')
+fig19.savefig("CroatiaHungary_0_14EMz.png")
+plt.close('all')
+
+
+# _0_14 z diff
+HRVHUNdata = genfromtxt('CroatiaHungary_0_14EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 0--14)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_0_14EMdiffz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 0--14 for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungary_0_14EMdiffz.png")
+plt.close('all')
+
+
+
+
+
+# _15_64
+HRVHUNdata = genfromtxt('CroatiaHungary_15_64EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
 ax20.set_ylabel(r'Excess mortality P-scores (ages 15--64)')
 ax19.yaxis.set_tick_params(length=0)
@@ -2840,33 +2967,108 @@ ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary_15_64.pdf")
+fig19.savefig("CroatiaHungary_15_64EM.pdf")
 ax19.set_title(r'Vaccinations and excess mortality for ages 15--64 for Croatia and Hungary')
-fig19.savefig("CroatiaHungary_15_64.png")
+fig19.savefig("CroatiaHungary_15_64EM.png")
 plt.close('all')
 
-# _65_74
-vaxdata = genfromtxt('CroatiaHungary_65_74.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+
+
+
+
+# _15_64 z
+HRVHUNdata = genfromtxt('CroatiaHungary_15_64EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 15--64)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_15_64EMz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 15--64 for Croatia and Hungary')
+fig19.savefig("CroatiaHungary_15_64EMz.png")
+plt.close('all')
+
+
+# _15_64 z diff
+HRVHUNdata = genfromtxt('CroatiaHungary_15_64EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 15--64)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_15_64EMdiffz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 15--64 for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungary_15_64EMdiffz.png")
+plt.close('all')
+
+
+
+
+# _65_74
+HRVHUNdata = genfromtxt('CroatiaHungary_65_74EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
 ax20.set_ylabel(r'Excess mortality P-scores (ages 65--74)')
 ax19.yaxis.set_tick_params(length=0)
@@ -2874,33 +3076,105 @@ ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary_65_74.pdf")
+fig19.savefig("CroatiaHungary_65_74EM.pdf")
 ax19.set_title(r'Vaccinations and excess mortality for ages 65--74 for Croatia and Hungary')
-fig19.savefig("CroatiaHungary_65_74.png")
+fig19.savefig("CroatiaHungary_65_74EM.png")
 plt.close('all')
 
-# _75_84
-vaxdata = genfromtxt('CroatiaHungary_75_84.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+# _65_74 z
+HRVHUNdata = genfromtxt('CroatiaHungary_65_74EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 65--74)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_65_74EMz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 65--74 for Croatia and Hungary')
+fig19.savefig("CroatiaHungary_65_74EMz.png")
+plt.close('all')
+
+
+
+
+# _65_74 z diff
+HRVHUNdata = genfromtxt('CroatiaHungary_65_74EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate minus Croatia COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 65--74)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_65_74EMdiffz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 65--74 for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungary_65_74EMdiffz.png")
+plt.close('all')
+
+
+
+# _75_84
+HRVHUNdata = genfromtxt('CroatiaHungary_75_84EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
 ax20.set_ylabel(r'Excess mortality P-scores (ages 75--84)')
 ax19.yaxis.set_tick_params(length=0)
@@ -2908,67 +3182,204 @@ ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary_75_84.pdf")
+fig19.savefig("CroatiaHungary_75_84EM.pdf")
 ax19.set_title(r'Vaccinations and excess mortality for ages 75--84 for Croatia and Hungary')
-fig19.savefig("CroatiaHungary_75_84.png")
+fig19.savefig("CroatiaHungary_75_84EM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CroatiaHungary_85p.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+# _75_84 z
+HRVHUNdata = genfromtxt('CroatiaHungary_75_84EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
-ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 75--84)')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 1)])
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungary_85p.pdf")
+fig19.savefig("CroatiaHungary_75_84EMz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 75--84 for Croatia and Hungary')
+fig19.savefig("CroatiaHungary_75_84EMz.png")
+plt.close('all')
+
+# _75_84 z diff
+HRVHUNdata = genfromtxt('CroatiaHungary_75_84EM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 excess mortality minus Croatia excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel(r'Excess mortality P-scores (ages 75--84)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_75_84EMdiffz.pdf")
+ax19.set_title(r'Vaccinations and excess mortality for ages 75--84 for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungary_75_84EMzdiff.png")
+plt.close('all')
+
+# 85p
+HRVHUNdata = genfromtxt('CroatiaHungary_85pEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel('Excess mortality P-scores (ages 85+)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_85pEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for ages 85+ for Croatia and Hungary')
-fig19.savefig("CroatiaHungary_85p.png")
+fig19.savefig("CroatiaHungary_85pEM.png")
 plt.close('all')
 
-
-
-vaxdata = genfromtxt('CroatiaHungary.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-vax_diff = np.subtract(vax_PRT, vax_DZA)
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
-deaths_diff = np.subtract(deaths_PRT, deaths_DZA)
+# 85p z
+HRVHUNdata = genfromtxt('CroatiaHungary_85pEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='C - H vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='C - H excess mortality')
+HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
+HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
+HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
+HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel('Excess mortality P-scores (ages 85+)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_85pEMz.pdf")
+ax19.set_title('Vaccinations and excess mortality for ages 85+ for Croatia and Hungary')
+fig19.savefig("CroatiaHungary_85pEMz.png")
+plt.close('all')
+
+# 85p z diff
+HRVHUNdata = genfromtxt('CroatiaHungary_85pEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV) # np.subtract(x1, x2) = x1 - x2
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million (all ages)')
+ax20.set_ylabel('Excess mortality P-scores (ages 85+)')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungary_85pEMdiffz.pdf")
+ax19.set_title('Vaccinations and excess mortality for ages 85+ for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungary_85pEMdiffz.png")
+plt.close('all')
+
+
+
+
+
+HRVHUNdata = genfromtxt('CroatiaHungaryEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV)
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -2982,31 +3393,66 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CroatiaHungarydiff.pdf")
-ax19.set_title('Vaccinations and excess mortality for Croatia and Hungary')
-fig19.savefig("CroatiaHungarydiff.png")
+fig19.savefig("CroatiaHungaryEMdiff.pdf")
+ax19.set_title('Vaccinations and excess mortality for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungaryEMdiff.png")
+plt.close('all')
+
+HRVHUNdata = genfromtxt('CroatiaHungaryEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HRVHUNdata]
+vax_HRV = [row[1] for row in HRVHUNdata]
+vax_HUN = [row[2] for row in HRVHUNdata]
+deaths_HRV = [row[3] for row in HRVHUNdata]
+deaths_HUN = [row[4] for row in HRVHUNdata]
+vax_diff = np.subtract(vax_HUN, vax_HRV)
+deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
+HRVHUNem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Excess mortality P-scores')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.set_xlim([dt.date(2020, 1, 1), dt.date(2021, 6, 5)])
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("CroatiaHungaryEMdiffz.pdf")
+ax19.set_title('Vaccinations and excess mortality for Croatia and Hungary (differences)')
+fig19.savefig("CroatiaHungaryEMdiffz.png")
 plt.close('all')
 
 
 
 
 
-vaxdata = genfromtxt('CubaJamaicaCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+
+
+CUBJAMdata = genfromtxt('CubaJamaicaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CUBJAMdata]
+vax_CUB = [row[1] for row in CUBJAMdata]
+vax_JAM = [row[2] for row in CUBJAMdata]
+deaths_CUB = [row[3] for row in CUBJAMdata]
+deaths_JAM = [row[4] for row in CUBJAMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Cuba COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Jamaica COVID-19 deaths')
+CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
+JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
+CUBcd = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba COVID-19 death rate')
+JAMcd = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3023,20 +3469,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Cuba and Jamaica')
 fig19.savefig("CubaJamaicaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('CubaJamaica.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+CUBJAMdata = genfromtxt('CubaJamaicaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CUBJAMdata]
+vax_CUB = [row[1] for row in CUBJAMdata]
+vax_JAM = [row[2] for row in CUBJAMdata]
+deaths_CUB = [row[3] for row in CUBJAMdata]
+deaths_JAM = [row[4] for row in CUBJAMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Jamaica excess mortality')
+CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
+JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
+CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
+JAMem = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3050,26 +3496,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CubaJamaica.pdf")
+fig19.savefig("CubaJamaicaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Cuba and Jamaica')
-fig19.savefig("CubaJamaica.png")
+fig19.savefig("CubaJamaicaEM.png")
 plt.close('all')
 
-
-vaxdata = genfromtxt('CubaSaintVincentandtheGrenadines.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+CUBVCTdata = genfromtxt('CubaSaintVincentandtheGrenadinesEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in CUBVCTdata]
+vax_CUB = [row[1] for row in CUBVCTdata]
+vax_VCT = [row[2] for row in CUBVCTdata]
+deaths_CUB = [row[3] for row in CUBVCTdata]
+deaths_VCT = [row[4] for row in CUBVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines excess mortality')
+CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
+VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
+CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
+VCTem = ax20.plot(dates, smooth(deaths_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3083,27 +3528,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("CubaSaintVincentandtheGrenadines.pdf")
+fig19.savefig("CubaSaintVincentandtheGrenadinesEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Cuba and Saint Vincent and the Grenadines')
-fig19.savefig("CubaSaintVincentandtheGrenadines.png")
+fig19.savefig("CubaSaintVincentandtheGrenadinesEM.png")
 plt.close('all')
 
-
-
-vaxdata = genfromtxt('DenmarkFinland.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DNKFINdata = genfromtxt('DenmarkFinlandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DNKFINdata]
+vax_DNK = [row[1] for row in DNKFINdata]
+vax_FIN = [row[2] for row in DNKFINdata]
+deaths_DNK = [row[3] for row in DNKFINdata]
+deaths_FIN = [row[4] for row in DNKFINdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Finland vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Finland excess mortality')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+FINv = ax19.plot(dates, smooth(vax_FIN, 28), alpha=0.5, lw=2, label='Finland vaccination rate')
+DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
+FINem = ax20.plot(dates, smooth(deaths_FIN, 28), alpha=0.5, lw=2, label='Finland excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3117,28 +3560,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("DenmarkFinland.pdf")
+fig19.savefig("DenmarkFinlandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Denmark and Finland')
-fig19.savefig("DenmarkFinland.png")
+fig19.savefig("DenmarkFinlandEM.png")
 plt.close('all')
 
-
-
-
-vaxdata = genfromtxt('DenmarkGermany.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DNKDEUdata = genfromtxt('DenmarkGermanyEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DNKDEUdata]
+vax_DNK = [row[1] for row in DNKDEUdata]
+vax_DEU = [row[2] for row in DNKDEUdata]
+deaths_DNK = [row[3] for row in DNKDEUdata]
+deaths_DEU = [row[4] for row in DNKDEUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Germany vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Germany excess mortality')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+DEUv = ax19.plot(dates, smooth(vax_DEU, 28), alpha=0.5, lw=2, label='Germany vaccination rate')
+DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
+DEUem = ax20.plot(dates, smooth(deaths_DEU, 28), alpha=0.5, lw=2, label='Germany excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3152,27 +3592,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("DenmarkGermany.pdf")
+fig19.savefig("DenmarkGermanyEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Denmark and Germany')
-fig19.savefig("DenmarkGermany.png")
+fig19.savefig("DenmarkGermanyEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('DenmarkNorwayCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DNKNORdata = genfromtxt('DenmarkNorwayCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DNKNORdata]
+vax_DNK = [row[1] for row in DNKNORdata]
+vax_NOR = [row[2] for row in DNKNORdata]
+deaths_DNK = [row[3] for row in DNKNORdata]
+deaths_NOR = [row[4] for row in DNKNORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Denmark COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Norway COVID-19 deaths')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
+DNKcd = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark COVID-19 death rate')
+NORcd = ax20.plot(dates, smooth(deaths_NOR, 28), alpha=0.5, lw=2, label='Norway COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3189,20 +3629,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Denmark and Norway')
 fig19.savefig("DenmarkNorwayCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('DenmarkNorway.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DNKNORdata = genfromtxt('DenmarkNorwayEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DNKNORdata]
+vax_DNK = [row[1] for row in DNKNORdata]
+vax_NOR = [row[2] for row in DNKNORdata]
+deaths_DNK = [row[3] for row in DNKNORdata]
+deaths_NOR = [row[4] for row in DNKNORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Norway excess mortality')
+DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
+NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
+DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
+NORem = ax20.plot(dates, smooth(deaths_NOR, 28), alpha=0.5, lw=2, label='Norway excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3216,59 +3656,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("DenmarkNorway.pdf")
+fig19.savefig("DenmarkNorwayEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Denmark and Norway')
-fig19.savefig("DenmarkNorway.png")
+fig19.savefig("DenmarkNorwayEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('DominicanRepublicHaitiCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_ARM = [row[1] for row in vaxdata]
-vax_AZE = [row[2] for row in vaxdata]
-deaths_ARM = [row[3] for row in vaxdata]
-deaths_AZE = [row[4] for row in vaxdata]
-fig29 = plt.figure(facecolor='w')
-ax29 = fig29.add_subplot(111, axisbelow=True)
-ax30 = ax29.twinx()
-ax30._get_lines.prop_cycler = ax29._get_lines.prop_cycler
-ARMv = ax29.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='DominicanRepublic vaccination rate')
-AZEv = ax29.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Haiti vaccination rate')
-ARMem = ax30.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='DominicanRepublic excess mortality')
-AZEem = ax30.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='Haiti excess mortality')
-ax29.set_ylabel('Daily vaccination doses per million')
-ax30.set_ylabel('Excess mortality P-scores')
-ax29.yaxis.set_tick_params(length=0)
-ax29.xaxis.set_tick_params(length=0)
-ax29.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax29.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-ax29.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-fig29.autofmt_xdate()
-ax29.grid(visible=True)
-legend.get_frame().set_alpha(1)
-lines, labels = ax19.get_legend_handles_labels()
-lines2, labels2 = ax20.get_legend_handles_labels()
-plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig29.savefig("DominicanRepublicHaitiCD.pdf")
-ax29.set_title('Vaccinations and excess mortality for DominicanRepublic and Haiti')
-fig29.savefig("DominicanRepublicHaitiCD.png")
-plt.close('all')
-
-vaxdata = genfromtxt('FaeroeIslandsNorwayCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+DOMHTIdata = genfromtxt('DominicanRepublicHaitiCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in DOMHTIdata]
+vax_DOM = [row[1] for row in DOMHTIdata]
+vax_HTI = [row[2] for row in DOMHTIdata]
+deaths_DOM = [row[3] for row in DOMHTIdata]
+deaths_HTI = [row[4] for row in DOMHTIdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Faeroe Islands vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Faeroe Islands COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Norway COVID-19 deaths')
+DOMv = ax19.plot(dates, smooth(vax_DOM, 28), alpha=0.5, lw=2, label='Dominican Republic vaccination rate')
+HTIv = ax19.plot(dates, smooth(vax_HTI, 28), alpha=0.5, lw=2, label='Haiti vaccination rate')
+DOMcd = ax20.plot(dates, smooth(deaths_DOM, 28), alpha=0.5, lw=2, label='Dominican Republic COVID-19 death rate')
+HTIcd = ax20.plot(dates, smooth(deaths_HTI, 28), alpha=0.5, lw=2, label='Haiti COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3280,27 +3688,57 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("FaeroeIslandsNorwayCD.pdf")
-ax19.set_title('Vaccinations and COVID-19 deaths for Faeroe Islands and Norway')
-fig19.savefig("FaeroeIslandsNorwayCD.png")
+fig19.savefig("DominicanRepublicHaitiCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Dominican Republic and Haiti')
+fig19.savefig("DominicanRepublicHaitiCD.png")
 plt.close('all')
 
-
-
-vaxdata = genfromtxt('FaeroeIslandsNorway.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+FRONORdata = genfromtxt('FaroeIslandsNorwayCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in FRONORdata]
+vax_FRO = [row[1] for row in FRONORdata]
+vax_NOR = [row[2] for row in FRONORdata]
+deaths_FRO = [row[3] for row in FRONORdata]
+deaths_NOR = [row[4] for row in FRONORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Faeroe Islands vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Faeroe Islands excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Norway excess mortality')
+FROv = ax19.plot(dates, smooth(vax_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands vaccination rate')
+NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
+FROcd = ax20.plot(dates, smooth(deaths_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands COVID-19 death rate')
+NORcd = ax20.plot(dates, smooth(deaths_NOR, 28), alpha=0.5, lw=2, label='Norway COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("FaroeIslandsNorwayCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Faroe Islands and Norway')
+fig19.savefig("FaroeIslandsNorwayCD.png")
+plt.close('all')
+
+FRONORdata = genfromtxt('FaroeIslandsNorwayEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in FRONORdata]
+vax_FRO = [row[1] for row in FRONORdata]
+vax_NOR = [row[2] for row in FRONORdata]
+deaths_FRO = [row[3] for row in FRONORdata]
+deaths_NOR = [row[4] for row in FRONORdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+FROv = ax19.plot(dates, smooth(vax_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands vaccination rate')
+NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
+FROem = ax20.plot(dates, smooth(deaths_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands excess mortality')
+NORem = ax20.plot(dates, smooth(deaths_NOR, 28), alpha=0.5, lw=2, label='Norway excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3314,25 +3752,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("FaeroeIslandsNorway.pdf")
-ax19.set_title('Vaccinations and excess mortality for Faeroe Islands and Norway')
-fig19.savefig("FaeroeIslandsNorway.png")
+fig19.savefig("FaroeIslandsNorwayEM.pdf")
+ax19.set_title('Vaccinations and excess mortality for Faroe Islands and Norway')
+fig19.savefig("FaroeIslandsNorwayEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('FrenchPolynesiaNewZealand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+PYFNZLdata = genfromtxt('FrenchPolynesiaNewZealandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in PYFNZLdata]
+vax_PYF = [row[1] for row in PYFNZLdata]
+vax_NZL = [row[2] for row in PYFNZLdata]
+deaths_PYF = [row[3] for row in PYFNZLdata]
+deaths_NZL = [row[4] for row in PYFNZLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='French Polynesia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='French Polynesia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='New Zealand excess mortality')
+PYFv = ax19.plot(dates, smooth(vax_PYF, 28), alpha=0.5, lw=2, label='French Polynesia vaccination rate')
+NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
+PYFem = ax20.plot(dates, smooth(deaths_PYF, 28), alpha=0.5, lw=2, label='French Polynesia excess mortality')
+NZLem = ax20.plot(dates, smooth(deaths_NZL, 28), alpha=0.5, lw=2, label='New Zealand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3346,27 +3784,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("FrenchPolynesiaNewZealand.pdf")
+fig19.savefig("FrenchPolynesiaNewZealandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for French Polynesia and New Zealand')
-fig19.savefig("FrenchPolynesiaNewZealand.png")
+fig19.savefig("FrenchPolynesiaNewZealandEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('GibraltarIndia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_GIB = [row[1] for row in vaxdata]
-vax_IND = [row[2] for row in vaxdata]
-deaths_GIB = [row[3] for row in vaxdata]
-deaths_IND = [row[4] for row in vaxdata]
+GIBINDdata = genfromtxt('GibraltarIndiaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in GIBINDdata]
+vax_GIB = [row[1] for row in GIBINDdata]
+vax_IND = [row[2] for row in GIBINDdata]
+deaths_GIB = [row[3] for row in GIBINDdata]
+deaths_IND = [row[4] for row in GIBINDdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 GIBv = ax19.plot(dates, smooth(vax_GIB, 28), alpha=0.5, lw=2, label='Gibraltar vaccination rate')
 INDv = ax19.plot(dates, smooth(vax_IND, 28), alpha=0.5, lw=2, label='India vaccination rate')
-GIBem = ax20.plot(dates, smooth(deaths_GIB, 28), alpha=0.5, lw=2, label='Gibraltar excess mortality')
-INDem = ax20.plot(dates, smooth(deaths_IND, 28), alpha=0.5, lw=2, label='India excess mortality')
+GIBcd = ax20.plot(dates, smooth(deaths_GIB, 28), alpha=0.5, lw=2, label='Gibraltar COVID-19 death rate')
+INDcd = ax20.plot(dates, smooth(deaths_IND, 28), alpha=0.5, lw=2, label='India COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3378,25 +3816,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("GibraltarIndia.pdf")
-ax19.set_title('Vaccinations and excess mortality for Gibraltar and India')
-fig19.savefig("GibraltarIndia.png")
+fig19.savefig("GibraltarIndiaCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Gibraltar and India')
+fig19.savefig("GibraltarIndiaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('HongKongMacao.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HKGMACdata = genfromtxt('HongKongMacaoEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HKGMACdata]
+vax_HKG = [row[1] for row in HKGMACdata]
+vax_MAC = [row[2] for row in HKGMACdata]
+deaths_HKG = [row[3] for row in HKGMACdata]
+deaths_MAC = [row[4] for row in HKGMACdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Macao vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Macao excess mortality')
+HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
+MACv = ax19.plot(dates, smooth(vax_MAC, 28), alpha=0.5, lw=2, label='Macao vaccination rate')
+HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
+MACem = ax20.plot(dates, smooth(deaths_MAC, 28), alpha=0.5, lw=2, label='Macao excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3410,29 +3848,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("HongKongMacao.pdf")
+fig19.savefig("HongKongMacaoEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Hong Kong and Macao')
-fig19.savefig("HongKongMacao.png")
+fig19.savefig("HongKongMacaoEM.png")
 plt.close('all')
 
-
-
-vaxdata = genfromtxt('HongKongPhilippinesCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HKGPHLdata = genfromtxt('HongKongPhilippinesCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HKGPHLdata]
+vax_HKG = [row[1] for row in HKGPHLdata]
+vax_PHL = [row[2] for row in HKGPHLdata]
+deaths_HKG = [row[3] for row in HKGPHLdata]
+deaths_PHL = [row[4] for row in HKGPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Hong Kong COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Philippines COVID-19 deaths')
+HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
+PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
+HKGcd = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong COVID-19 death rate')
+PHLcd = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3449,20 +3885,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Hong Kong and Philippines')
 fig19.savefig("HongKongPhilippinesCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('HongKongPhilippines.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HKGPHLdata = genfromtxt('HongKongPhilippinesEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HKGPHLdata]
+vax_HKG = [row[1] for row in HKGPHLdata]
+vax_PHL = [row[2] for row in HKGPHLdata]
+deaths_HKG = [row[3] for row in HKGPHLdata]
+deaths_PHL = [row[4] for row in HKGPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
+HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
+PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
+HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
+PHLem = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3476,25 +3912,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("HongKongPhilippines.pdf")
+fig19.savefig("HongKongPhilippinesEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Hong Kong and Philippines')
-fig19.savefig("HongKongPhilippines.png")
+fig19.savefig("HongKongPhilippinesEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('HongKongSouthKorea.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+HKGKORdata = genfromtxt('HongKongSouthKoreaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HKGKORdata]
+vax_HKG = [row[1] for row in HKGKORdata]
+vax_KOR = [row[2] for row in HKGKORdata]
+deaths_HKG = [row[3] for row in HKGKORdata]
+deaths_KOR = [row[4] for row in HKGKORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
+HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
+KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
+HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
+KORem = ax20.plot(dates, smooth(deaths_KOR, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3508,27 +3944,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("HongKongSouthKorea.pdf")
+fig19.savefig("HongKongSouthKoreaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Hong Kong and South Korea')
-fig19.savefig("HongKongSouthKorea.png")
+fig19.savefig("HongKongSouthKoreaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('HungaryRomaniaCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_HUN = [row[1] for row in vaxdata]
-vax_ROU = [row[2] for row in vaxdata]
-deaths_HUN = [row[3] for row in vaxdata]
-deaths_ROU = [row[4] for row in vaxdata]
+HUNROUdata = genfromtxt('HungaryRomaniaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HUNROUdata]
+vax_HUN = [row[1] for row in HUNROUdata]
+vax_ROU = [row[2] for row in HUNROUdata]
+deaths_HUN = [row[3] for row in HUNROUdata]
+deaths_ROU = [row[4] for row in HUNROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
-HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary COVID-19 deaths')
-ROUem = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania COVID-19 deaths')
+HUNcd = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate')
+ROUcd = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3545,12 +3981,12 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Hungary and Romania')
 fig19.savefig("HungaryRomaniaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('HungaryRomania.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_HUN = [row[1] for row in vaxdata]
-vax_ROU = [row[2] for row in vaxdata]
-deaths_HUN = [row[3] for row in vaxdata]
-deaths_ROU = [row[4] for row in vaxdata]
+HUNROUdata = genfromtxt('HungaryRomaniaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in HUNROUdata]
+vax_HUN = [row[1] for row in HUNROUdata]
+vax_ROU = [row[2] for row in HUNROUdata]
+deaths_HUN = [row[3] for row in HUNROUdata]
+deaths_ROU = [row[4] for row in HUNROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
@@ -3572,27 +4008,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("HungaryRomania.pdf")
+fig19.savefig("HungaryRomaniaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Hungary and Romania')
-fig19.savefig("HungaryRomania.png")
+fig19.savefig("HungaryRomaniaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('IndonesiaPhilippines.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_IDN = [row[1] for row in vaxdata]
-vax_PHL = [row[2] for row in vaxdata]
-deaths_IDN = [row[3] for row in vaxdata]
-deaths_PHL = [row[4] for row in vaxdata]
+IDNPHLdata = genfromtxt('IndonesiaPhilippinesCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in IDNPHLdata]
+vax_IDN = [row[1] for row in IDNPHLdata]
+vax_PHL = [row[2] for row in IDNPHLdata]
+deaths_IDN = [row[3] for row in IDNPHLdata]
+deaths_PHL = [row[4] for row in IDNPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 IDNv = ax19.plot(dates, smooth(vax_IDN, 28), alpha=0.5, lw=2, label='Indonesia vaccination rate')
 PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
-IDNem = ax20.plot(dates, smooth(deaths_IDN, 28), alpha=0.5, lw=2, label='Indonesia excess mortality')
-PHLem = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
+IDNcd = ax20.plot(dates, smooth(deaths_IDN, 28), alpha=0.5, lw=2, label='Indonesia COVID-19 death rate')
+PHLcd = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3604,27 +4040,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("IndonesiaPhilippines.pdf")
-ax19.set_title('Vaccinations and excess mortality for Indonesia and Philippines')
-fig19.savefig("IndonesiaPhilippines.png")
+fig19.savefig("IndonesiaPhilippinesCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Indonesia and Philippines')
+fig19.savefig("IndonesiaPhilippinesCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('IraqOman.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_IRQ = [row[1] for row in vaxdata]
-vax_OMN = [row[2] for row in vaxdata]
-deaths_IRQ = [row[3] for row in vaxdata]
-deaths_OMN = [row[4] for row in vaxdata]
+IRQOMNdata = genfromtxt('IraqOmanCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in IRQOMNdata]
+vax_IRQ = [row[1] for row in IRQOMNdata]
+vax_OMN = [row[2] for row in IRQOMNdata]
+deaths_IRQ = [row[3] for row in IRQOMNdata]
+deaths_OMN = [row[4] for row in IRQOMNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 IRQv = ax19.plot(dates, smooth(vax_IRQ, 28), alpha=0.5, lw=2, label='Iraq vaccination rate')
 OMNv = ax19.plot(dates, smooth(vax_OMN, 28), alpha=0.5, lw=2, label='Oman vaccination rate')
-IRQem = ax20.plot(dates, smooth(deaths_IRQ, 28), alpha=0.5, lw=2, label='Iraq COVID-19 death rate')
-OMNem = ax20.plot(dates, smooth(deaths_OMN, 28), alpha=0.5, lw=2, label='Oman COVID-19 death rate')
+IRQcd = ax20.plot(dates, smooth(deaths_IRQ, 28), alpha=0.5, lw=2, label='Iraq COVID-19 death rate')
+OMNcd = ax20.plot(dates, smooth(deaths_OMN, 28), alpha=0.5, lw=2, label='Oman COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3636,27 +4072,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("IraqOman.pdf")
+fig19.savefig("IraqOmanCD.pdf")
 ax19.set_title('Vaccinations and COVID-19 deaths for Iraq and Oman')
-fig19.savefig("IraqOman.png")
+fig19.savefig("IraqOmanCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('JamaicaSaintVincentandtheGrenadinesCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+JAMPRTdata = genfromtxt('JamaicaSaintVincentandtheGrenadinesCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in JAMPRTdata]
+vax_JAM = [row[1] for row in JAMPRTdata]
+vax_PRT = [row[2] for row in JAMPRTdata]
+deaths_JAM = [row[3] for row in JAMPRTdata]
+deaths_PRT = [row[4] for row in JAMPRTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='SaintVincentandtheGrenadines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='SaintVincentandtheGrenadines excess mortality')
+JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
+PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
+JAMcd = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica COVID-19 death rate')
+PRTcd = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3669,24 +4105,24 @@ lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesCD.pdf")
-ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and SaintVincentandtheGrenadines')
+ax19.set_title('Vaccinations and COVID-19 deaths for Antigua and Barbuda and Saint Vincent and the Grenadines')
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('JamaicaSaintVincentandtheGrenadines.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+JAMVCTdata = genfromtxt('JamaicaSaintVincentandtheGrenadinesEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in JAMVCTdata]
+vax_JAM = [row[1] for row in JAMVCTdata]
+vax_VCT = [row[2] for row in JAMVCTdata]
+deaths_JAM = [row[3] for row in JAMVCTdata]
+deaths_VCT = [row[4] for row in JAMVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='SaintVincentandtheGrenadines vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='SaintVincentandtheGrenadines excess mortality')
+JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
+VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
+JAMem = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica excess mortality')
+VCTem = ax20.plot(dates, smooth(deaths_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3700,25 +4136,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("JamaicaSaintVincentandtheGrenadines.pdf")
+fig19.savefig("JamaicaSaintVincentandtheGrenadinesEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and SaintVincentandtheGrenadines')
-fig19.savefig("JamaicaSaintVincentandtheGrenadines.png")
+fig19.savefig("JamaicaSaintVincentandtheGrenadinesEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('JapanMalaysia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+JPNMYSdata = genfromtxt('JapanMalaysiaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in JPNMYSdata]
+vax_JPN = [row[1] for row in JPNMYSdata]
+vax_MYS = [row[2] for row in JPNMYSdata]
+deaths_JPN = [row[3] for row in JPNMYSdata]
+deaths_MYS = [row[4] for row in JPNMYSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Japan excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
+JPNv = ax19.plot(dates, smooth(vax_JPN, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
+MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
+JPNem = ax20.plot(dates, smooth(deaths_JPN, 28), alpha=0.5, lw=2, label='Japan excess mortality')
+MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3732,25 +4168,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("JapanMalaysia.pdf")
+fig19.savefig("JapanMalaysiaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Japan and Malaysia')
-fig19.savefig("JapanMalaysia.png")
+fig19.savefig("JapanMalaysiaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('JapanSouthKorea.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+JPNKORdata = genfromtxt('JapanSouthKoreaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in JPNKORdata]
+vax_JPN = [row[1] for row in JPNKORdata]
+vax_KOR = [row[2] for row in JPNKORdata]
+deaths_JPN = [row[3] for row in JPNKORdata]
+deaths_KOR = [row[4] for row in JPNKORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Japan excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
+JPNv = ax19.plot(dates, smooth(vax_JPN, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
+KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
+JPNem = ax20.plot(dates, smooth(deaths_JPN, 28), alpha=0.5, lw=2, label='Japan excess mortality')
+KORem = ax20.plot(dates, smooth(deaths_KOR, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3764,27 +4200,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("JapanSouthKorea.pdf")
+fig19.savefig("JapanSouthKoreaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Japan and South Korea')
-fig19.savefig("JapanSouthKorea.png")
+fig19.savefig("JapanSouthKoreaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('KyrgyzstanUzbekistanCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+KGZUZBdata = genfromtxt('KyrgyzstanUzbekistanCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in KGZUZBdata]
+vax_KGZ = [row[1] for row in KGZUZBdata]
+vax_UZB = [row[2] for row in KGZUZBdata]
+deaths_KGZ = [row[3] for row in KGZUZBdata]
+deaths_UZB = [row[4] for row in KGZUZBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Uzbekistan excess mortality')
+KGZv = ax19.plot(dates, smooth(vax_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan vaccination rate')
+UZBv = ax19.plot(dates, smooth(vax_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
+KGZcd = ax20.plot(dates, smooth(deaths_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan COVID-19 death rate')
+UZBcd = ax20.plot(dates, smooth(deaths_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3797,24 +4233,24 @@ lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
 fig19.savefig("KyrgyzstanUzbekistanCD.pdf")
-ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and Uzbekistan')
+ax19.set_title('Vaccinations and COVID-19 deaths for Kyrgyzstan and Uzbekistan')
 fig19.savefig("KyrgyzstanUzbekistanCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('KyrgyzstanUzbekistan.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+KGZUZBdata = genfromtxt('KyrgyzstanUzbekistanEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in KGZUZBdata]
+vax_KGZ = [row[1] for row in KGZUZBdata]
+vax_UZB = [row[2] for row in KGZUZBdata]
+deaths_KGZ = [row[3] for row in KGZUZBdata]
+deaths_UZB = [row[4] for row in KGZUZBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Uzbekistan excess mortality')
+KGZv = ax19.plot(dates, smooth(vax_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan vaccination rate')
+UZBv = ax19.plot(dates, smooth(vax_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
+KGZem = ax20.plot(dates, smooth(deaths_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan excess mortality')
+UZBem = ax20.plot(dates, smooth(deaths_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3828,27 +4264,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("KyrgyzstanUzbekistan.pdf")
-ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and Uzbekistan')
-fig19.savefig("KyrgyzstanUzbekistan.png")
+fig19.savefig("KyrgyzstanUzbekistanEM.pdf")
+ax19.set_title('Vaccinations and excess mortality for Kyrgyzstan and Uzbekistan')
+fig19.savefig("KyrgyzstanUzbekistanEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('LatviaUkraineCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+LVAUKRdata = genfromtxt('LatviaUkraineCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in LVAUKRdata]
+vax_LVA = [row[1] for row in LVAUKRdata]
+vax_UKR = [row[2] for row in LVAUKRdata]
+deaths_LVA = [row[3] for row in LVAUKRdata]
+deaths_UKR = [row[4] for row in LVAUKRdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Latvia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Ukraine COVID-19 deaths')
+LVAv = ax19.plot(dates, smooth(vax_LVA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
+UKRv = ax19.plot(dates, smooth(vax_UKR, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
+LVAcd = ax20.plot(dates, smooth(deaths_LVA, 28), alpha=0.5, lw=2, label='Latvia COVID-19 death rate')
+UKRcd = ax20.plot(dates, smooth(deaths_UKR, 28), alpha=0.5, lw=2, label='Ukraine COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('COVID-19 death rate')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -3865,20 +4301,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Latvia and Ukraine')
 fig19.savefig("LatviaUkraineCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('LatviaUkraine.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+LVAUKRdata = genfromtxt('LatviaUkraineEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in LVAUKRdata]
+vax_LVA = [row[1] for row in LVAUKRdata]
+vax_UKR = [row[2] for row in LVAUKRdata]
+deaths_LVA = [row[3] for row in LVAUKRdata]
+deaths_UKR = [row[4] for row in LVAUKRdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Latvia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Ukraine excess mortality')
+LVAv = ax19.plot(dates, smooth(vax_LVA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
+UKRv = ax19.plot(dates, smooth(vax_UKR, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
+LVAem = ax20.plot(dates, smooth(deaths_LVA, 28), alpha=0.5, lw=2, label='Latvia excess mortality')
+UKRem = ax20.plot(dates, smooth(deaths_UKR, 28), alpha=0.5, lw=2, label='Ukraine excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3892,27 +4328,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("LatviaUkraine.pdf")
+fig19.savefig("LatviaUkraineEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Latvia and Ukraine')
-fig19.savefig("LatviaUkraine.png")
+fig19.savefig("LatviaUkraineEM.png")
 plt.close('all')
 
-
-
-vaxdata = genfromtxt('LebanonPalestine.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+LBNPSEdata = genfromtxt('LebanonPalestineEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in LBNPSEdata]
+vax_LBN = [row[1] for row in LBNPSEdata]
+vax_PSE = [row[2] for row in LBNPSEdata]
+deaths_LBN = [row[3] for row in LBNPSEdata]
+deaths_PSE = [row[4] for row in LBNPSEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Lebanon vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Palestine vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Lebanon excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Palestine excess mortality')
+LBNv = ax19.plot(dates, smooth(vax_LBN, 28), alpha=0.5, lw=2, label='Lebanon vaccination rate')
+PSEv = ax19.plot(dates, smooth(vax_PSE, 28), alpha=0.5, lw=2, label='Palestine vaccination rate')
+LBNem = ax20.plot(dates, smooth(deaths_LBN, 28), alpha=0.5, lw=2, label='Lebanon excess mortality')
+PSEem = ax20.plot(dates, smooth(deaths_PSE, 28), alpha=0.5, lw=2, label='Palestine excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3926,25 +4360,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("LebanonPalestine.pdf")
+fig19.savefig("LebanonPalestineEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Lebanon and Palestine')
-fig19.savefig("LebanonPalestine.png")
+fig19.savefig("LebanonPalestineEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MalaysiaMongolia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MYSMNGdata = genfromtxt('MalaysiaMongoliaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MYSMNGdata]
+vax_MYS = [row[1] for row in MYSMNGdata]
+vax_MNG = [row[2] for row in MYSMNGdata]
+deaths_MYS = [row[3] for row in MYSMNGdata]
+deaths_MNG = [row[4] for row in MYSMNGdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Mongolia excess mortality')
+MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
+MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
+MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
+MNGem = ax20.plot(dates, smooth(deaths_MNG, 28), alpha=0.5, lw=2, label='Mongolia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3958,25 +4392,25 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("MalaysiaMongolia.pdf")
+fig19.savefig("MalaysiaMongoliaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Malaysia and Mongolia')
-fig19.savefig("MalaysiaMongolia.png")
+fig19.savefig("MalaysiaMongoliaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MalaysiaTaiwan.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MYSTWNdata = genfromtxt('MalaysiaTaiwanEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MYSTWNdata]
+vax_MYS = [row[1] for row in MYSTWNdata]
+vax_TWN = [row[2] for row in MYSTWNdata]
+deaths_MYS = [row[3] for row in MYSTWNdata]
+deaths_TWN = [row[4] for row in MYSTWNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Taiwan vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Taiwan excess mortality')
+MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
+TWNv = ax19.plot(dates, smooth(vax_TWN, 28), alpha=0.5, lw=2, label='Taiwan vaccination rate')
+MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
+TWNem = ax20.plot(dates, smooth(deaths_TWN, 28), alpha=0.5, lw=2, label='Taiwan excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -3990,27 +4424,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("MalaysiaTaiwan.pdf")
+fig19.savefig("MalaysiaTaiwanEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Malaysia and Taiwan')
-fig19.savefig("MalaysiaTaiwan.png")
+fig19.savefig("MalaysiaTaiwanEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MalaysiaThailandCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MYSTHAdata = genfromtxt('MalaysiaThailandCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MYSTHAdata]
+vax_MYS = [row[1] for row in MYSTHAdata]
+vax_THA = [row[2] for row in MYSTHAdata]
+deaths_MYS = [row[3] for row in MYSTHAdata]
+deaths_THA = [row[4] for row in MYSTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Malaysia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand COVID-19 deaths')
+MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+MYScd = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia COVID-19 death rate')
+THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4027,20 +4461,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Malaysia and Thailand')
 fig19.savefig("MalaysiaThailandCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MalaysiaThailand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MYSTHAdata = genfromtxt('MalaysiaThailandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MYSTHAdata]
+vax_MYS = [row[1] for row in MYSTHAdata]
+vax_THA = [row[2] for row in MYSTHAdata]
+deaths_MYS = [row[3] for row in MYSTHAdata]
+deaths_THA = [row[4] for row in MYSTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
+MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
+THAem = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4054,30 +4488,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("MalaysiaThailand.pdf")
+fig19.savefig("MalaysiaThailandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Malaysia and Thailand')
-fig19.savefig("MalaysiaThailand.png")
+fig19.savefig("MalaysiaThailandEM.png")
 plt.close('all')
 
-
-
-
-vaxdata = genfromtxt('MauritiusSeychellesCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MUSSYCdata = genfromtxt('MauritiusSeychellesCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MUSSYCdata]
+vax_MUS = [row[1] for row in MUSSYCdata]
+vax_SYC = [row[2] for row in MUSSYCdata]
+deaths_MUS = [row[3] for row in MUSSYCdata]
+deaths_SYC = [row[4] for row in MUSSYCdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Mauritius COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 deaths')
+MUSv = ax19.plot(dates, smooth(vax_MUS, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
+SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
+MUScd = ax20.plot(dates, smooth(deaths_MUS, 28), alpha=0.5, lw=2, label='Mauritius COVID-19 death rate')
+SYCcd = ax20.plot(dates, smooth(deaths_SYC, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4094,20 +4525,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Mauritius and Seychelles')
 fig19.savefig("MauritiusSeychellesCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MauritiusSeychelles.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MUSSYCdata = genfromtxt('MauritiusSeychellesEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MUSSYCdata]
+vax_MUS = [row[1] for row in MUSSYCdata]
+vax_SYC = [row[2] for row in MUSSYCdata]
+deaths_MUS = [row[3] for row in MUSSYCdata]
+deaths_SYC = [row[4] for row in MUSSYCdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Mauritius excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Seychelles excess mortality')
+MUSv = ax19.plot(dates, smooth(vax_MUS, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
+SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
+MUSem = ax20.plot(dates, smooth(deaths_MUS, 28), alpha=0.5, lw=2, label='Mauritius excess mortality')
+SYCem = ax20.plot(dates, smooth(deaths_SYC, 28), alpha=0.5, lw=2, label='Seychelles excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4121,27 +4552,27 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("MauritiusSeychelles.pdf")
+fig19.savefig("MauritiusSeychellesEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Mauritius and Seychelles')
-fig19.savefig("MauritiusSeychelles.png")
+fig19.savefig("MauritiusSeychellesEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MongoliaThailandCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MNGTHAdata = genfromtxt('MongoliaThailandCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MNGTHAdata]
+vax_MNG = [row[1] for row in MNGTHAdata]
+vax_THA = [row[2] for row in MNGTHAdata]
+deaths_MNG = [row[3] for row in MNGTHAdata]
+deaths_THA = [row[4] for row in MNGTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Mongolia COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand COVID-19 deaths')
+MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+MNGcd = ax20.plot(dates, smooth(deaths_MNG, 28), alpha=0.5, lw=2, label='Mongolia COVID-19 death rate')
+THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4158,20 +4589,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Mongolia and Thailand')
 fig19.savefig("MongoliaThailandCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('MongoliaThailand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+MNGTHAdata = genfromtxt('MongoliaThailandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in MNGTHAdata]
+vax_MNG = [row[1] for row in MNGTHAdata]
+vax_THA = [row[2] for row in MNGTHAdata]
+deaths_MNG = [row[3] for row in MNGTHAdata]
+deaths_THA = [row[4] for row in MNGTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Mongolia excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
+MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+MNGem = ax20.plot(dates, smooth(deaths_MNG, 28), alpha=0.5, lw=2, label='Mongolia excess mortality')
+THAem = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4185,57 +4616,57 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("MongoliaThailand.pdf")
+fig19.savefig("MongoliaThailandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Mongolia and Thailand')
-fig19.savefig("MongoliaThailand.png")
+fig19.savefig("MongoliaThailandEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('PapuaNewGuineaSolomonIslandsCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_ARM = [row[1] for row in vaxdata]
-vax_AZE = [row[2] for row in vaxdata]
-deaths_ARM = [row[3] for row in vaxdata]
-deaths_AZE = [row[4] for row in vaxdata]
-fig29 = plt.figure(facecolor='w')
-ax29 = fig29.add_subplot(111, axisbelow=True)
-ax30 = ax29.twinx()
-ax30._get_lines.prop_cycler = ax29._get_lines.prop_cycler
-ARMv = ax29.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='PapuaNewGuinea vaccination rate')
-AZEv = ax29.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='SolomonIslands vaccination rate')
-ARMem = ax30.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='PapuaNewGuinea excess mortality')
-AZEem = ax30.plot(dates, smooth(deaths_AZE, 28), alpha=0.5, lw=2, label='SolomonIslands excess mortality')
-ax29.set_ylabel('Daily vaccination doses per million')
-ax30.set_ylabel('Excess mortality P-scores')
-ax29.yaxis.set_tick_params(length=0)
-ax29.xaxis.set_tick_params(length=0)
-ax29.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
-ax29.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-ax29.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-fig29.autofmt_xdate()
-ax29.grid(visible=True)
-legend.get_frame().set_alpha(1)
-lines, labels = ax19.get_legend_handles_labels()
-lines2, labels2 = ax20.get_legend_handles_labels()
-plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig29.savefig("PapuaNewGuineaSolomonIslandsCD.pdf")
-ax29.set_title('Vaccinations and excess mortality for PapuaNewGuinea and SolomonIslands')
-fig29.savefig("PapuaNewGuineaSolomonIslandsCD.png")
-plt.close('all')
-
-vaxdata = genfromtxt('PhilippinesSouthKorea.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+PNGSLBdata = genfromtxt('PapuaNewGuineaSolomonIslandsCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in PNGSLBdata]
+vax_PNG = [row[1] for row in PNGSLBdata]
+vax_SLB = [row[2] for row in PNGSLBdata]
+deaths_PNG = [row[3] for row in PNGSLBdata]
+deaths_SLB = [row[4] for row in PNGSLBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
+PNGv = ax19.plot(dates, smooth(vax_PNG, 28), alpha=0.5, lw=2, label='Papua New Guinea vaccination rate')
+SLBv = ax19.plot(dates, smooth(vax_SLB, 28), alpha=0.5, lw=2, label='Solomon Islands vaccination rate')
+PNGcd = ax20.plot(dates, smooth(deaths_PNG, 28), alpha=0.5, lw=2, label='Papua New Guinea COVID-19 death rate')
+SLBcd = ax20.plot(dates, smooth(deaths_SLB, 28), alpha=0.5, lw=2, label='Solomon Islands COVID-19 death rate')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
+ax19.yaxis.set_tick_params(length=0)
+ax19.xaxis.set_tick_params(length=0)
+ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
+ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
+fig19.autofmt_xdate()
+ax19.grid(visible=True)
+legend.get_frame().set_alpha(1)
+lines, labels = ax19.get_legend_handles_labels()
+lines2, labels2 = ax20.get_legend_handles_labels()
+plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
+fig19.savefig("PapuaNewGuineaSolomonIslandsCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for PapuaNewGuinea and SolomonIslands')
+fig19.savefig("PapuaNewGuineaSolomonIslandsCD.png")
+plt.close('all')
+
+PHLKORdata = genfromtxt('PhilippinesSouthKoreaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in PHLKORdata]
+vax_PHL = [row[1] for row in PHLKORdata]
+vax_KOR = [row[2] for row in PHLKORdata]
+deaths_PHL = [row[3] for row in PHLKORdata]
+deaths_KOR = [row[4] for row in PHLKORdata]
+fig19 = plt.figure(facecolor='w')
+ax19 = fig19.add_subplot(111, axisbelow=True)
+ax20 = ax19.twinx()
+ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
+KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
+PHLem = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
+KORem = ax20.plot(dates, smooth(deaths_KOR, 28), alpha=0.5, lw=2, label='South Korea excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4249,33 +4680,32 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("PhilippinesSouthKorea.pdf")
+fig19.savefig("PhilippinesSouthKoreaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Philippines and South Korea')
-fig19.savefig("PhilippinesSouthKorea.png")
+fig19.savefig("PhilippinesSouthKoreaEM.png")
 plt.close('all')
 
-vaxdata = genfromtxt('RomaniaRussiaCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+ROURUSdata = genfromtxt('RomaniaRussiaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ROURUSdata]
+vax_ROU = [row[1] for row in ROURUSdata]
+vax_RUS = [row[2] for row in ROURUSdata]
+deaths_ROU = [row[3] for row in ROURUSdata]
+deaths_RUS = [row[4] for row in ROURUSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Romania COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Russia COVID-19 deaths')
+ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
+RUSv = ax19.plot(dates, smooth(vax_RUS, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
+ROUcd = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania COVID-19 death rate')
+RUScd = ax20.plot(dates, smooth(deaths_RUS, 28), alpha=0.5, lw=2, label='Russia COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-#ax19.set_xlim(right=dt.date(2020, 12, 7))
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
@@ -4287,20 +4717,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Romania and Russia')
 fig19.savefig("RomaniaRussiaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('RomaniaRussia.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+ROURUSdata = genfromtxt('RomaniaRussiaEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ROURUSdata]
+vax_ROU = [row[1] for row in ROURUSdata]
+vax_RUS = [row[2] for row in ROURUSdata]
+deaths_ROU = [row[3] for row in ROURUSdata]
+deaths_RUS = [row[4] for row in ROURUSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Romania excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Russia excess mortality')
+ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
+RUSv = ax19.plot(dates, smooth(vax_RUS, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
+ROUem = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania excess mortality')
+RUSem = ax20.plot(dates, smooth(deaths_RUS, 28), alpha=0.5, lw=2, label='Russia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4314,12 +4744,12 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("RomaniaRussia.pdf")
+fig19.savefig("RomaniaRussiaEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Romania and Russia')
-fig19.savefig("RomaniaRussia.png")
+fig19.savefig("RomaniaRussiaEM.png")
 plt.close('all')
 
-RWAUGAdata = genfromtxt('RwandaUganda.txt', delimiter='\t', converters = {0: date_parser})
+RWAUGAdata = genfromtxt('RwandaUgandaCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in RWAUGAdata]
 vax_RWA = [row[1] for row in RWAUGAdata]
 vax_UGA = [row[2] for row in RWAUGAdata]
@@ -4331,43 +4761,42 @@ ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 RWAv = ax19.plot(dates, smooth(vax_RWA, 28), alpha=0.5, lw=2, label='Rwanda vaccination rate')
 UGAv = ax19.plot(dates, smooth(vax_UGA, 28), alpha=0.5, lw=2, label='Uganda vaccination rate')
-RWAem = ax20.plot(dates, smooth(deaths_RWA, 28), alpha=0.5, lw=2, label='Rwanda excess mortality')
-UGAem = ax20.plot(dates, smooth(deaths_UGA, 28), alpha=0.5, lw=2, label='Uganda excess mortality')
+RWAcd = ax20.plot(dates, smooth(deaths_RWA, 28), alpha=0.5, lw=2, label='Rwanda COVID-19 death rate')
+UGAcd = ax20.plot(dates, smooth(deaths_UGA, 28), alpha=0.5, lw=2, label='Uganda COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
 ax19.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 ax19.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
-#ax19.set_xlim(right=dt.date(2020, 12, 7))
 fig19.autofmt_xdate()
 ax19.grid(visible=True)
 legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("RwandaUganda.pdf")
-ax19.set_title('Vaccinations and excess mortality for Rwanda and Uganda')
-fig19.savefig("RwandaUganda.png")
+fig19.savefig("RwandaUgandaCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Rwanda and Uganda')
+fig19.savefig("RwandaUgandaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('SeychellesTanzaniaCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+SYCTZAdata = genfromtxt('SeychellesTanzaniaCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in SYCTZAdata]
+vax_SYC = [row[1] for row in SYCTZAdata]
+vax_TZA = [row[2] for row in SYCTZAdata]
+deaths_SYC = [row[3] for row in SYCTZAdata]
+deaths_TZA = [row[4] for row in SYCTZAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Tanzania vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Tanzania COVID-19 deaths')
+SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
+TZAv = ax19.plot(dates, smooth(vax_TZA, 28), alpha=0.5, lw=2, label='Tanzania vaccination rate')
+SYCcd = ax20.plot(dates, smooth(deaths_SYC, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 death rate')
+TZAcd = ax20.plot(dates, smooth(deaths_TZA, 28), alpha=0.5, lw=2, label='Tanzania COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4384,22 +4813,22 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Seychelles and Tanzania')
 fig19.savefig("SeychellesTanzaniaCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('SingaporeThailandCD.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+SGPTHAdata = genfromtxt('SingaporeThailandCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in SGPTHAdata]
+vax_SGP = [row[1] for row in SGPTHAdata]
+vax_THA = [row[2] for row in SGPTHAdata]
+deaths_SGP = [row[3] for row in SGPTHAdata]
+deaths_THA = [row[4] for row in SGPTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Singapore COVID-19 deaths')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand COVID-19 deaths')
+SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+SGPcd = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore COVID-19 death rate')
+THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4416,20 +4845,20 @@ ax19.set_title('Vaccinations and COVID-19 deaths for Singapore and Thailand')
 fig19.savefig("SingaporeThailandCD.png")
 plt.close('all')
 
-vaxdata = genfromtxt('SingaporeThailand.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in vaxdata]
-vax_DZA = [row[1] for row in vaxdata]
-vax_PRT = [row[2] for row in vaxdata]
-deaths_DZA = [row[3] for row in vaxdata]
-deaths_PRT = [row[4] for row in vaxdata]
+SGPTHAdata = genfromtxt('SingaporeThailandEM.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in SGPTHAdata]
+vax_SGP = [row[1] for row in SGPTHAdata]
+vax_THA = [row[2] for row in SGPTHAdata]
+deaths_SGP = [row[3] for row in SGPTHAdata]
+deaths_THA = [row[4] for row in SGPTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
-PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
-DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Singapore excess mortality')
-PRTem = ax20.plot(dates, smooth(deaths_PRT, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
+SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
+THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
+SGPem = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore excess mortality')
+THAem = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -4443,12 +4872,12 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("SingaporeThailand.pdf") # sixth figure in paper
+fig19.savefig("SingaporeThailandEM.pdf")
 ax19.set_title('Vaccinations and excess mortality for Singapore and Thailand')
-fig19.savefig("SingaporeThailand.png")
+fig19.savefig("SingaporeThailandEM.png")
 plt.close('all')
 
-THAVNMdata = genfromtxt('ThailandVietnam.txt', delimiter='\t', converters = {0: date_parser})
+THAVNMdata = genfromtxt('ThailandVietnamCD.txt', delimiter='\t', converters = {0: date_parser})
 dates = [row[0] for row in THAVNMdata]
 vax_THA = [row[1] for row in THAVNMdata]
 vax_VNM = [row[2] for row in THAVNMdata]
@@ -4460,10 +4889,10 @@ ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
-THAem = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand excess mortality')
-VNMem = ax20.plot(dates, smooth(deaths_VNM, 28), alpha=0.5, lw=2, label='Vietnam excess mortality')
+THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
+VNMcd = ax20.plot(dates, smooth(deaths_VNM, 28), alpha=0.5, lw=2, label='Vietnam COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('Excess mortality P-scores')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4475,17 +4904,17 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("ThailandVietnam.pdf")
-ax19.set_title('Vaccinations and excess mortality for Thailand and Vietnam')
-fig19.savefig("ThailandVietnam.png")
+fig19.savefig("ThailandVietnamCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Thailand and Vietnam')
+fig19.savefig("ThailandVietnamCD.png")
 plt.close('all')
 
-ZambiaZimbabwedata = genfromtxt('ZambiaZimbabwe.txt', delimiter='\t', converters = {0: date_parser})
-dates = [row[0] for row in ZambiaZimbabwedata]
-vax_ZMB = [row[1] for row in ZambiaZimbabwedata]
-vax_ZWE = [row[2] for row in ZambiaZimbabwedata]
-deaths_ZMB = [row[3] for row in ZambiaZimbabwedata]
-deaths_ZWE = [row[4] for row in ZambiaZimbabwedata]
+ZMBZWEdata = genfromtxt('ZambiaZimbabweCD.txt', delimiter='\t', converters = {0: date_parser})
+dates = [row[0] for row in ZMBZWEdata]
+vax_ZMB = [row[1] for row in ZMBZWEdata]
+vax_ZWE = [row[2] for row in ZMBZWEdata]
+deaths_ZMB = [row[3] for row in ZMBZWEdata]
+deaths_ZWE = [row[4] for row in ZMBZWEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
@@ -4495,7 +4924,7 @@ ZWEv = ax19.plot(dates, smooth(vax_ZWE, 28), alpha=0.5, lw=2, label='Zimbabwe va
 ZMBcd = ax20.plot(dates, smooth(deaths_ZMB, 28), alpha=0.5, lw=2, label='Zambia COVID-19 death rate')
 ZWEcd = ax20.plot(dates, smooth(deaths_ZWE, 28), alpha=0.5, lw=2, label='Zimbabwe COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax19.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -4507,9 +4936,9 @@ legend.get_frame().set_alpha(1)
 lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
-fig19.savefig("ZambiaZimbabwe.pdf")
-ax19.set_title('Vaccinations and excess mortality for Zambia and Zimbabwe')
-fig19.savefig("ZambiaZimbabwe.png")
+fig19.savefig("ZambiaZimbabweCD.pdf")
+ax19.set_title('Vaccinations and COVID-19 deaths for Zambia and Zimbabwe')
+fig19.savefig("ZambiaZimbabweCD.png")
 plt.close('all')
 
 
