@@ -1,7 +1,7 @@
 // The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 // Martin Sewell
 // martin.sewell@cantab.net
-// 7 August 2024
+// 22 October 2024
 
 // INPUT FILES: [all downloaded on 1 August 2024]
 // Info on data: [For information only, do not need this.]
@@ -37,8 +37,8 @@
 
 // COVID-19 deaths
 // https://ourworldindata.org/covid-deaths [already downloaded above]
-// new_deaths_per_million
-// owid-covid-data.csv [column 14 (where first col is 0)]
+// new_deaths_smoothed_per_million
+// owid-covid-data.csv [column 15 (where first col is 0)]
 // used for coviddeaths[] and cumcoviddeaths[]
 // iso_code,continent,location,date,total_cases,new_cases.............
 // AFG,Asia,Afghanistan,2020-01-03,,0.0,,,0.0,,,0.0,,,0.0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,54.422,18.6,2.581,1.337,1803.987,,597.029,9.59,,,37.746,0.5,64.83,0.511,41128772.0,,,,
@@ -67,13 +67,7 @@ int numentities;
 std::vector<int> vaxlow;
 std::vector<int> vaxmed;
 std::vector<int> vaxhigh;
-
-
-
 std::vector <std::string> continent;
-
-// https://github.com/cjekel/DTW_cpp/blob/master/examples/quick_distance.cpp
-
 
 #include "boost/algorithm/string.hpp"
 #include "boost/date_time/gregorian/gregorian.hpp"
@@ -88,15 +82,6 @@ std::string tostring(double t) {
     str.erase(str.find_last_not_of('0') + offset, std::string::npos);
     return str;
 }
-
-
-
-// Sum
-//long double Sum(std::vector<long double> v)
-//{
-//	long double sum = accumulate(v.begin(), v.end(), 0.0);
-//	return sum;
-//}
 
 // Mean
 long double Mean(std::vector<long double> v)
@@ -147,8 +132,6 @@ double p_norm(std::vector<double> a, std::vector<double> b, double p) {
 	}
 	return std::pow(d, 1.0 / p);
 }
-
-
 
 std::vector<double> Interpolate(std::vector<double> v) {
     std::vector<double> interpolated;
@@ -2656,7 +2639,6 @@ int main()
 
 	std::vector <std::string> display;
 
-
 	// PARSE FILE TO DETERMINE SET OF ENTITIES AND DATES
 	std::vector <std::string> fields;
 	std::vector <std::string> entity;
@@ -2929,9 +2911,9 @@ int main()
 					d = from_simple_string(fields[3]);
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[0].empty() && !fields[14].empty() && (dateint < numdates)) {
-						coviddeaths[CountryIndex(code, fields[0])][dateint] = stod(fields[14]);
-						cumcoviddeaths[CountryIndex(code, fields[0])] = cumcoviddeaths[CountryIndex(code, fields[0])] + stod(fields[14]);
+					if (!fields[0].empty() && !fields[15].empty() && (dateint < numdates)) {
+						coviddeaths[CountryIndex(code, fields[0])][dateint] = stod(fields[15]);
+						cumcoviddeaths[CountryIndex(code, fields[0])] = cumcoviddeaths[CountryIndex(code, fields[0])] + stod(fields[15]);
 					}
 				}
 				catch (const std::exception& e) {

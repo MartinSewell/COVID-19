@@ -1,7 +1,7 @@
 # The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
 # Martin Sewell
 # martin.sewell@cantab.net
-# 12 August 2024
+# 23 October 2024
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -1151,9 +1151,9 @@ for t, y in enumerate(em3):
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
 axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
-axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high masks stringency')
-axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium masks stringency')
-axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low masks stringency')
+axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
+axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
+axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
 axLV.set_ylabel('Excess mortality P-scores')
 axLV.xaxis.set_tick_params(length=0)
 axLV.yaxis.set_tick_params(length=0)
@@ -1187,9 +1187,9 @@ for t, y in enumerate(em3):
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
 axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
-axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high masks stringency')
-axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium masks stringency')
-axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low masks stringency')
+axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
+axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
+axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
 axLV.set_ylabel('Excess mortality P-scores')
 axLV.xaxis.set_tick_params(length=0)
 axLV.yaxis.set_tick_params(length=0)
@@ -1223,9 +1223,9 @@ for t, y in enumerate(em3):
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
 axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
-axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high masks stringency')
-axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium masks stringency')
-axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low masks stringency')
+axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
+axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
+axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
 axLV.set_ylabel('Excess mortality P-scores')
 axLV.xaxis.set_tick_params(length=0)
 axLV.yaxis.set_tick_params(length=0)
@@ -1469,10 +1469,10 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(ldh, 28), alpha=0.5, lw=2, label='Lockdown stringency for high-stringency countries')
-p2 = ax19.plot(dates, smooth(ldl, 28), alpha=0.5, lw=2, label='Lockdown stringency for low-stringency countries')
-p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for for high-stringency countries')
-p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low-stringency countries')
+p1 = ax19.plot(dates, smooth(ldh, 28), alpha=0.5, lw=2, label='Lockdown stringency in high-stringency countries')
+p2 = ax19.plot(dates, smooth(ldl, 28), alpha=0.5, lw=2, label='Lockdown stringency in low-stringency countries')
+p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality in high-stringency countries')
+p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality in low-stringency countries')
 ax19.set_ylabel('Lockdown stringency')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1519,10 +1519,10 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(mh, 28), alpha=0.5, lw=2, label='Mask index for high-masking countries')
-p2 = ax19.plot(dates, smooth(ml, 28), alpha=0.5, lw=2, label='Mask index for low-masking countries')
-p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for high-masking countries')
-p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality for low-masking countries')
+p1 = ax19.plot(dates, smooth(mh, 28), alpha=0.5, lw=2, label='Mask index in high mask stringency countries')
+p2 = ax19.plot(dates, smooth(ml, 28), alpha=0.5, lw=2, label='Mask index in low mask stringency countries')
+p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality in high mask stringency countries')
+p4 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality in low mask stringency countries')
 ax19.set_ylabel('Face covering policies index')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
@@ -1576,14 +1576,14 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
-p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
-p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
-p4 = ax20.plot(dates, smooth(cdh, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for highly-vaccinated countries')
-p5 = ax20.plot(dates, smooth(cdm, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for medium-vaccinated countries')
-p6 = ax20.plot(dates, smooth(cdl, 28*2), alpha=0.5, lw=2, label='COVID-19 death rate for low-vaccinated countries')
-ax19.set_ylabel('Vaccination doses per million')
-ax20.set_ylabel('COVID-19 deaths per million')
+p1 = ax19.plot(dates, smooth(vh, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
+p2 = ax19.plot(dates, smooth(vm, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
+p3 = ax19.plot(dates, smooth(vl, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
+p4 = ax20.plot(dates, smooth(cdh, 28), alpha=0.5, lw=2, label='COVID-19 death rate in highly-vaccinated countries')
+p5 = ax20.plot(dates, smooth(cdm, 28), alpha=0.5, lw=2, label='COVID-19 death rate in medium-vaccinated countries')
+p6 = ax20.plot(dates, smooth(cdl, 28), alpha=0.5, lw=2, label='COVID-19 death rate in low-vaccinated countries')
+ax19.set_ylabel('Daily vaccination doses per million')
+ax20.set_ylabel('Daily COVID-19 deaths per million')
 ax19.yaxis.set_tick_params(length=0)
 ax20.xaxis.set_tick_params(length=0)
 ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1621,40 +1621,40 @@ for c, d in enumerate(numclust):
             cd1[:] = np.nan
             for t, y in enumerate(cd1):
                 cd1[t] = np.nanmean(vaxhighvx[t], axis=0)
-            p1 = ax19.plot(dates, smooth(cd1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
+            p1 = ax19.plot(dates, smooth(cd1, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
         if vaxmedvx.size > 0:
             cd2 = np.empty(len(dates))
             cd2[:] = np.nan
             for t, y in enumerate(cd2):
                 cd2[t] = np.nanmean(vaxmedvx[t], axis=0)
-            p2 = ax19.plot(dates, smooth(cd2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
+            p2 = ax19.plot(dates, smooth(cd2, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
         if vaxlowvx.size > 0:
             cd3 = np.empty(len(dates))
             cd3[:] = np.nan
             for t, y in enumerate(cd3):
                 cd3[t] = np.nanmean(vaxlowvx[t], axis=0)
-            p3 = ax19.plot(dates, smooth(cd3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
+            p3 = ax19.plot(dates, smooth(cd3, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
         if vaxhighcd.size > 0:
             cd4 = np.empty(len(dates))
             cd4[:] = np.nan
             for t, y in enumerate(cd4):
                 cd4[t] = np.nanmean(vaxhighcd[t], axis=0)
-            p4 = ax20.plot(dates, smooth(cd4, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for highly-vaccinated countries') # COVID-19 deaths for highly vaccinated countries
+            p4 = ax20.plot(dates, smooth(cd4, 28), alpha=0.5, lw=2, label='COVID-19 deaths in highly-vaccinated countries') # COVID-19 deaths for highly vaccinated countries
         if vaxmedcd.size > 0:
             cd5 = np.empty(len(dates))
             cd5[:] = np.nan
             for t, y in enumerate(cd5):
                 cd5[t] = np.nanmean(vaxmedcd[t], axis=0)
-            p5 = ax20.plot(dates, smooth(cd5, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for medium-vaccinated countries') # COVID-19 deaths for medium vaccinated countries
+            p5 = ax20.plot(dates, smooth(cd5, 28), alpha=0.5, lw=2, label='COVID-19 deaths in medium-vaccinated countries') # COVID-19 deaths for medium vaccinated countries
         if vaxlowcd.size > 0:
             cd6 = np.empty(len(dates))
             cd6[:] = np.nan
             for t, y in enumerate(cd6):
                 cd6[t] = np.nanmean(vaxlowcd[t], axis=0)
-            p6 = ax20.plot(dates, smooth(cd6, 28*2), alpha=0.5, lw=2, label='COVID-19 deaths for low-vaccinated countries') # COVID-19 deaths for low vaccinated countries
+            p6 = ax20.plot(dates, smooth(cd6, 28), alpha=0.5, lw=2, label='COVID-19 deaths in low-vaccinated countries') # COVID-19 deaths for low vaccinated countries
         if (vaxhighvx.size > 0 or vaxmedvx.size > 0 or vaxlowvx.size > 0 or vaxhighcd.size > 0 or vaxmedcd.size > 0 or vaxlowcd.size > 0):
-            ax19.set_ylabel('Vaccination doses per million')
-            ax20.set_ylabel('COVID-19 deaths per million')
+            ax19.set_ylabel('Daily vaccination doses per million')
+            ax20.set_ylabel('Daily COVID-19 deaths per million')
             ax19.yaxis.set_tick_params(length=0)
             ax20.xaxis.set_tick_params(length=0)
             ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1688,40 +1688,40 @@ for c, d in enumerate(numclust):
             em1[:] = np.nan
             for t, y in enumerate(em1):
                 em1[t] = np.nanmean(vaxhighvx[t], axis=0)
-            p1 = ax19.plot(dates, smooth(em1, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
+            p1 = ax19.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries') # Vaccination rate in highly vaccinated countries
         if vaxmedvx.size > 0:
             em2 = np.empty(len(dates))
             em2[:] = np.nan
             for t, y in enumerate(em2):
                 em2[t] = np.nanmean(vaxmedvx[t], axis=0)
-            p2 = ax19.plot(dates, smooth(em2, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
+            p2 = ax19.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries') # Vaccination rate in medium vaccinated countries
         if vaxlowvx.size > 0:
             em3 = np.empty(len(dates))
             em3[:] = np.nan
             for t, y in enumerate(em3):
                 em3[t] = np.nanmean(vaxlowvx[t], axis=0)
-            p3 = ax19.plot(dates, smooth(em3, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
+            p3 = ax19.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries') # Vaccination rate in low vaccinated countries
         if vaxhighem.size > 0:
             em4 = np.empty(len(dates))
             em4[:] = np.nan
             for t, y in enumerate(em4):
                 em4[t] = np.nanmean(vaxhighem[t], axis=0)
-            p4 = ax20.plot(dates, smooth(em4, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly-vaccinated countries') # Excess mortality for highly vaccinated countries
+            p4 = ax20.plot(dates, smooth(em4, 28), alpha=0.5, lw=2, label='Excess mortality in highly-vaccinated countries') # Excess mortality for highly vaccinated countries
         if vaxmedem.size > 0:
             em5 = np.empty(len(dates))
             em5[:] = np.nan
             for t, y in enumerate(em5):
                 em5[t] = np.nanmean(vaxmedem[t], axis=0)
-            p5 = ax20.plot(dates, smooth(em5, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium-vaccinated countries') # Excess mortality for medium vaccinated countries
+            p5 = ax20.plot(dates, smooth(em5, 28), alpha=0.5, lw=2, label='Excess mortality in medium-vaccinated countries') # Excess mortality for medium vaccinated countries
         if vaxlowem.size > 0:
             em6 = np.empty(len(dates))
             em6[:] = np.nan
             for t, y in enumerate(em6):
                 em6[t] = np.nanmean(vaxlowem[t], axis=0)
-            p6 = ax20.plot(dates, smooth(em6, 28*2), alpha=0.5, lw=2, label='Excess mortality for low-vaccinated countries') # Excess mortality for low vaccinated countries
+            p6 = ax20.plot(dates, smooth(em6, 28), alpha=0.5, lw=2, label='Excess mortality in low-vaccinated countries') # Excess mortality for low vaccinated countries
         if (vaxhighvx.size > 0 or vaxmedvx.size > 0 or vaxlowvx.size > 0 or vaxhighcd.size > 0 or vaxmedcd.size > 0 or vaxlowcd.size > 0):
-            ax19.set_ylabel('Vaccination doses per million')
-            ax20.set_ylabel('COVID-19 deaths per million')
+            ax19.set_ylabel('Daily vaccination doses per million')
+            ax20.set_ylabel('Daily COVID-19 deaths per million')
             ax19.yaxis.set_tick_params(length=0)
             ax20.xaxis.set_tick_params(length=0)
             ax19.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -1775,13 +1775,13 @@ fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
 ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
-p1 = ax19.plot(dates, smooth(vh, 28*2), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
-p2 = ax19.plot(dates, smooth(vm, 28*2), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
-p3 = ax19.plot(dates, smooth(vl, 28*2), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
-p4 = ax20.plot(dates, smooth(emh, 28*2), alpha=0.5, lw=2, label='Excess mortality for highly-vaccinated countries')
-p5 = ax20.plot(dates, smooth(emm, 28*2), alpha=0.5, lw=2, label='Excess mortality for medium-vaccinated countries')
-p6 = ax20.plot(dates, smooth(eml, 28*2), alpha=0.5, lw=2, label='Excess mortality for low-vaccinated countries')
-ax19.set_ylabel('Vaccination doses per million')
+p1 = ax19.plot(dates, smooth(vh, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
+p2 = ax19.plot(dates, smooth(vm, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
+p3 = ax19.plot(dates, smooth(vl, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
+p4 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality in highly-vaccinated countries')
+p5 = ax20.plot(dates, smooth(emm, 28), alpha=0.5, lw=2, label='Excess mortality in medium-vaccinated countries')
+p6 = ax20.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Excess mortality in low-vaccinated countries')
+ax19.set_ylabel('Daily vaccination doses per million')
 ax20.set_ylabel('Excess mortality P-scores')
 ax19.yaxis.set_tick_params(length=0)
 ax20.xaxis.set_tick_params(length=0)
@@ -1825,16 +1825,23 @@ for i, c in enumerate(countries):
         ls = ms = vs = cds = ems = ''
         if sum(CNTRYlockdown0) > 0:
             CNTRY1 = axc.plot(dates, CNTRYlockdown, alpha=0.5, lw=2, label='Lockdown stringency', color='grey')
-            ls = 'Lockdown stringency, '
+            if sum(CNTRYmasks0) > 0 or sum(CNTRYvax0) > 0 or sum(CNTRYcoviddeaths0) > 0:
+                ls = 'Lockdown stringency, '
+            else:
+                ls = 'Lockdown stringency'
         if sum(CNTRYmasks0) > 0:
             CNTRYmasks2 = np.multiply(CNTRYmasks, 10)
             CNTRY2 = axc.plot(dates, CNTRYmasks2, alpha=0.5, lw=2, label='Mask index', color='c')
-            if sum(CNTRYlockdown0) == 0:
-                ms = r'Mask index $\times$10, '
-            if sum(CNTRYlockdown0) > 0:
-                ms = r'mask index $\times$10, '
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYvax0) == 0 and sum(CNTRYcoviddeaths0) > 0:
-                ms = r'Mask index $\times$10 '
+            if (not (sum(CNTRYlockdown0) > 0)):
+                ms = r'Mask index $\times$10'
+            else:
+                ms = r'mask index $\times$10'
+            if sum(CNTRYvax0) > 0 and sum(CNTRYcoviddeaths0) > 0:
+                ms = ms + ', '
+            if sum(CNTRYvax0) > 0 and (not (sum(CNTRYcoviddeaths0) > 0)):
+                ms = ms + ' and'
+            if (not (sum(CNTRYvax0) > 0)) and sum(CNTRYcoviddeaths0) > 0:
+                ms = ms + ' and'
         if sum(CNTRYvax0) > 0:
             CNTRYvax2 = np.multiply(CNTRYvax, 100)
             CNTRY3 = axc.plot(dates, smooth(CNTRYvax2, 28), alpha=0.5, lw=2, label='Vaccination rate', color='b')
@@ -1843,24 +1850,35 @@ for i, c in enumerate(countries):
             CNTRY4 = axc.plot(dates, smooth(CNTRYcoviddeaths2, 28), alpha=0.5, lw=2, label='COVID-19 death rate', color='k')
              
         if sum(CNTRYvax0) > 0:
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYcoviddeaths0) == 0:
-                vs = 'Vaccination rate/10,000'
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYcoviddeaths0) > 0:
-                vs = 'Vaccination rate/10,000 '
-            else:
-                vs = 'vaccination rate/10,000'
-                
+            if (sum(CNTRYlockdown0) > 0 or sum(CNTRYmasks0) > 0) and sum(CNTRYcoviddeaths0) > 0:
+                vs = 'daily vaccination doses/10,000 and '
+            if (sum(CNTRYlockdown0) > 0 or sum(CNTRYmasks0) > 0) and (not sum(CNTRYcoviddeaths0) > 0):
+                vs = 'daily vaccination doses/10,000'
+            if not(sum(CNTRYlockdown0) > 0 or sum(CNTRYmasks0) > 0) and sum(CNTRYcoviddeaths0) > 0:
+                vs = 'Daily vaccination doses/10,000 and '
+            if not(sum(CNTRYlockdown0) > 0 or sum(CNTRYmasks0) > 0) and (not sum(CNTRYcoviddeaths0) > 0):
+                vs = 'Daily vaccination doses/10,000'
+
         if sum(CNTRYcoviddeaths0) > 0:
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYvax0) == 0:
-                cds = 'COVID-19 deaths/100,000' 
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) == 0 and sum(CNTRYvax0) > 0:
-                cds = 'and COVID-19 deaths/100,000'
-            if sum(CNTRYlockdown0) > 0 and sum(CNTRYmasks0) > 0 and sum(CNTRYvax0) > 0:
-                cds = '\nand COVID-19 deaths/100,000'
-            if sum(CNTRYlockdown0) == 0 and sum(CNTRYmasks0) > 0 and sum(CNTRYvax0) == 0:
-                cds = 'and COVID-19 deaths/100,000'
-     
-        axc.set_ylabel(ls + ms + vs + cds)
+            if (sum(CNTRYlockdown0) > 0 or sum(CNTRYmasks0) > 0 or sum(CNTRYvax0) > 0):
+                cds = 'daily COVID-19 deaths/100,000'
+            else:
+                cds = 'Daily COVID-19 deaths/100,000'
+
+        ylabeltext = ""
+        if ls != "":
+            ylabeltext = ylabeltext + ls
+        if ms != "":
+            ylabeltext = ylabeltext + ms
+        if vs != "":
+            ylabeltext = ylabeltext + "\n" + vs
+        if cds != "":
+            ylabeltext = ylabeltext + "\n" + cds
+        
+        axc.set_ylabel(ylabeltext)
+
+
+
         if not all(val == 0 for val in CNTRYexcessmortality0):
             axem = axc.twinx()
             CNTRY5 = axem.plot(dates, smooth(CNTRYexcessmortality, 28), alpha=0.5, lw=2, label='Excess mortality', color='r')
@@ -4105,7 +4123,7 @@ lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesCD.pdf")
-ax19.set_title('Vaccinations and COVID-19 deaths for Antigua and Barbuda and Saint Vincent and the Grenadines')
+ax19.set_title('Vaccinations and COVID-19 deaths\nfor Antigua and Barbuda and Saint Vincent and the Grenadines')
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesCD.png")
 plt.close('all')
 
@@ -4137,7 +4155,7 @@ lines, labels = ax19.get_legend_handles_labels()
 lines2, labels2 = ax20.get_legend_handles_labels()
 plt.legend(lines + lines2, labels + labels2, fancybox=True, framealpha=0.8)
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesEM.pdf")
-ax19.set_title('Vaccinations and excess mortality for Antigua and Barbuda and SaintVincentandtheGrenadines')
+ax19.set_title('Vaccinations and excess mortality\nfor Antigua and Barbuda and Saint Vincent and the Grenadines')
 fig19.savefig("JamaicaSaintVincentandtheGrenadinesEM.png")
 plt.close('all')
 
