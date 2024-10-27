@@ -1,5 +1,5 @@
 1) Download all files from this GitHub directory.
-1) Put the three csv files in the same directory as SIR.py.
+1) Put the three text files in the same directory as SIR.py.
 2) Compile OurWorldinData.cpp.
 3) Download data from Our World in Data as instructed in OurWorldinData.cpp to the directory containing OurWorldinData.exe.
 4) Run OurWorldinData.exe.
