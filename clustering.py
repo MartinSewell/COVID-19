@@ -2,6 +2,8 @@
 # Martin Sewell
 # martin.sewell@cantab.net
 # 5 August 2024
+# Revised 17 October 2026: fixed random_state (and explicit n_init) so that the
+# cluster assignments are reproducible from run to run.
 
 ######################
 # K-MEANS CLUSTERING #
@@ -22,7 +24,7 @@ Xcd = genfromtxt('clusteringcd.txt', delimiter='\t')
 Xcd[np.isnan(Xcd)] = 0
 Xcd = np.apply_along_axis(smooth28, 1, Xcd)
 for num_clusters in range(2,21): # 2 to 20 inclusive (19 lines)
-    modelcd = KMeans(n_clusters = num_clusters)
+    modelcd = KMeans(n_clusters = num_clusters, n_init = 10, random_state = 0)
     labelscd = modelcd.fit_predict(Xcd)
     for i in labelscd:
         c.write(str(i)+'\t')
@@ -32,7 +34,7 @@ Xem = genfromtxt('clusteringem.txt', delimiter='\t')
 Xem[np.isnan(Xem)] = 0
 Xem = np.apply_along_axis(smooth28, 1, Xem)
 for num_clusters in range(2,21): # 2 to 20 inclusive (19 lines)
-    modelem = KMeans(n_clusters = num_clusters)
+    modelem = KMeans(n_clusters = num_clusters, n_init = 10, random_state = 0)
     labelsem = modelem.fit_predict(Xem)
     for i in labelsem:
         c.write(str(i)+'\t')

@@ -2,6 +2,11 @@
 # Martin Sewell
 # martin.sewell@cantab.net
 # 23 October 2024
+# Revised 17 October 2026: corrected beta at t=0; relabelled figures in terms of
+# s = 100*S/N (the percentage of the population susceptible); documented the
+# fixed-duration SIR reconstruction; made the output statistics explicitly
+# descriptive and added unsmoothed variants; removed no-op prop_cycler lines;
+# added a moving-block bootstrap uncertainty analysis for Statistics 1-3.
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -40,13 +45,22 @@ plt.rcParams['text.usetex'] = True
 
 # Function to parse dates in input files
 def date_parser(d_bytes):
-    s = d_bytes.decode('utf-8')
+    # NumPy passes bytes to genfromtxt converters in older versions and str in newer ones; handle both.
+    s = d_bytes.decode('utf-8') if isinstance(d_bytes, bytes) else d_bytes
     return np.datetime64(dt.datetime.strptime(s, '%d/%m/%Y'))
 
 # Function to smooth data
 def smooth(data, window_size):
     window = np.ones(int(window_size))/float(window_size)
     return np.convolve(data, window, mode='same')
+
+# Function to make a twin axis continue another axis's colour cycle.
+# (Axes._get_lines.prop_cycler was removed in matplotlib 3.8; this works on both old and new versions.)
+def sync_colour_cycle(ax_to, ax_from):
+    try:
+        ax_to._get_lines.prop_cycler = ax_from._get_lines.prop_cycler
+    except AttributeError:
+        ax_to._get_lines = ax_from._get_lines
 
 # output file
 f = open("output.txt","w", encoding='ascii')
@@ -200,6 +214,14 @@ for t, y in enumerate(infections_EN):
 #############
 # SIR Model #
 #############
+# The compartments are reconstructed directly from the inferred daily infections c_t
+# rather than by integrating the SIR ODEs:
+#   I_t = sum of c_k over the previous 9 days (a fixed infectious period of 1/gamma = 9 days),
+#   R_t = cumulative infections lagged 9 days, and S_t = S_{t-1} - c_t.
+# This is a fixed-duration variant of the SIR model: removal occurs exactly 9 days after
+# infection, not at the constant per-capita rate gamma*I of the continuous model.
+# The 35% assumed to have pre-existing immunity form a separate inactive compartment
+# P = 0.35*N, so S + I + R = 0.65*N and N = S + I + R + P.
 
 S_UK = [0.0] * num_UK_dates
 I_UK = [0.0] * num_UK_dates
@@ -633,7 +655,7 @@ fig11.savefig("fig11.png")
 # Beta Analysis #
 #################
 
-# Calculate the proportion (%) of the population who remain susceptible, S1
+# Calculate s = 100*S/N, the percentage of the population who remain susceptible (S1 in this code)
 # 100 * S divided by the total population
 S1_UK = [0.0] * num_UK_dates
 S1_SE = [0.0] * num_SE_dates
@@ -651,19 +673,19 @@ beta_EN = [0.0] * num_EN_dates
 
 for t, y in enumerate(beta_UK):
     if t == 0:
-        beta_UK[t] = -(pop_UK/(I_UK[t]*S_UK[t])) * (S_UK[t]-pop_UK)
+        beta_UK[t] = -(pop_UK/(I_UK[t]*S_UK[t])) * (-infections_UK[t]) # S_{-1} = S_UK[0] + infections_UK[0] = 0.65*pop_UK, so dS = -infections_UK[0]
     else:
         beta_UK[t] = -(pop_UK/(I_UK[t]*S_UK[t])) * (S_UK[t]-S_UK[t-1])
 
 for t, y in enumerate(beta_SE):
     if t == 0:
-        beta_SE[t] = -(pop_SE/(I_SE[t]*S_SE[t])) * (S_SE[t]-pop_SE)
+        beta_SE[t] = -(pop_SE/(I_SE[t]*S_SE[t])) * (-infections_SE[t]) # S_{-1} = S_SE[0] + infections_SE[0] = 0.65*pop_SE, so dS = -infections_SE[0]
     else:
         beta_SE[t] = -(pop_SE/(I_SE[t]*S_SE[t])) * (S_SE[t]-S_SE[t-1])
 
 for t, y in enumerate(beta_EN):
     if t == 0:
-        beta_EN[t] = -(pop_EN/(I_EN[t]*S_EN[t])) * (S_EN[t]-pop_EN)
+        beta_EN[t] = -(pop_EN/(I_EN[t]*S_EN[t])) * (-infections_EN[t]) # S_{-1} = S_EN[0] + infections_EN[0] = 0.65*pop_EN, so dS = -infections_EN[0]
     else:
         beta_EN[t] = -(pop_EN/(I_EN[t]*S_EN[t])) * (S_EN[t]-S_EN[t-1])
 
@@ -693,7 +715,7 @@ fig13 = plt.figure(facecolor='w')
 ax13 = fig13.add_subplot(111, axisbelow=True)
 ax13.plot(datesI_UK, S1_UK, alpha=0.5, lw=2, label='UK')
 ax13.plot(datesI_SE, S1_SE, alpha=0.5, lw=2, label='Sweden')
-ax13.set_ylabel(r'$\frac{S}{N}$')
+ax13.set_ylabel(r'$s$ (percentage of population susceptible)')
 ax13.yaxis.set_tick_params(length=0)
 ax13.xaxis.set_tick_params(length=0)
 ax13.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -701,7 +723,7 @@ ax13.xaxis.set_major_locator(mdates.DayLocator(interval=7*8))
 ax13.fmt_xdata = mdates.DateFormatter('%#d %b %Y')
 fig13.autofmt_xdate()
 ax13.grid(visible=True)
-ax13.set_title(r'$\frac{S}{N}$ from the SIR models for the UK and Sweden')
+ax13.set_title(r'$s$, the percentage of the population susceptible, in the SIR models for the UK and Sweden')
 legend = ax13.legend()
 legend.get_frame().set_alpha(1)
 
@@ -718,7 +740,7 @@ ax14 = fig14.add_subplot(111, axisbelow=True)
 ax14.plot(S1_EN, beta_EN, 'g', alpha=0.5, lw=2, label='England without lockdown')
 ax14.plot(S1_EN_lockdown, beta_EN, 'r', alpha=0.5, lw=2, label='England under lockdown')
 ax14.plot(S1_SE, beta_SE, 'b', alpha=0.5, lw=2, label='Sweden')
-ax14.set_xlabel(r'Percentage of population susceptible ($\frac{S}{N}$)')
+ax14.set_xlabel(r'Percentage of population susceptible, $s$')
 ax14.set_ylabel(r'$\beta$')
 ax14.yaxis.set_tick_params(length=0)
 ax14.xaxis.set_tick_params(length=0)
@@ -728,7 +750,7 @@ ax14.set_ylim(0,0.6) #ax14.set_ylim(0,0.3)
 legend = ax14.legend()
 legend.get_frame().set_alpha(1)
 fig14.savefig("fig3.pdf") # third figure in paper
-ax14.set_title(r'$\beta$ vs $\frac{S}{N}$ in the COVID-19 SIR model, data up to 30 June 2021')
+ax14.set_title(r'$\beta$ vs $s$ in the COVID-19 SIR model, data up to 30 June 2021')
 fig14.savefig("fig14.png")
 
 dS1dt_UK = [0.0] * num_UK_dates
@@ -799,7 +821,7 @@ ax15 = fig15.add_subplot(111, axisbelow=True)
 ax15.plot(epi_datesI_UK, epi_dbetadS1_UK, alpha=0.5, lw=2, label='UK')
 ax15.plot(datesI_SE, dbetadS1_SE, alpha=0.5, lw=2, label='Sweden')
 ax15.plot(epi_datesI_UK, control, alpha=0.5, lw=2, label='Control')
-ax15.set_ylabel(r'$\frac{\textrm{d}\beta}{\textrm{d}\frac{S}{N}}$')
+ax15.set_ylabel(r'$\frac{\textrm{d}\beta}{\textrm{d}s}$')
 ax15.yaxis.set_tick_params(length=0)
 ax15.xaxis.set_tick_params(length=0)
 ax15.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -813,7 +835,7 @@ legend = ax15.legend()
 legend.get_frame().set_alpha(1)
 
 #    ax15.spines[spine].set_visible(False)
-ax15.set_title(r'$\frac{\textrm{d}\beta}{\textrm{d}\frac{S}{N}}$ as the UK transitioned into its first lockdown')
+ax15.set_title(r'$\frac{\textrm{d}\beta}{\textrm{d}s}$ as the UK transitioned into its first lockdown')
 fig15.savefig("fig15.png")
 
 # Smooth data to reduce noise that may unduly influence end values measured, choose a window size of one standard deviation (12 days).
@@ -827,7 +849,7 @@ ax16 = fig16.add_subplot(111, axisbelow=True)
 ax16.plot(epi_datesI_UK, epi_dbetadS1_UK_smoothed, alpha=0.5, lw=2, label='UK')
 ax16.plot(datesI_SE, dbetadS1_SE_smoothed, alpha=0.5, lw=2, label='Sweden')
 ax16.plot(epi_datesI_UK, control_smoothed, alpha=0.5, lw=2, label='Control')
-ax16.set_ylabel(r'$\frac{\textrm{d}\beta}{\textrm{d}\frac{S}{N}}$')
+ax16.set_ylabel(r'$\frac{\textrm{d}\beta}{\textrm{d}s}$')
 ax16.yaxis.set_tick_params(length=0)
 ax16.xaxis.set_tick_params(length=0)
 ax16.xaxis.set_major_formatter(mdates.DateFormatter('%#d %b %Y'))
@@ -840,7 +862,7 @@ ax16.set_ylim(-0.25,0.25) # ax16.set_ylim(-0.2,0.2)
 legend = ax16.legend()
 legend.get_frame().set_alpha(1)
 fig16.savefig("fig4.pdf") # fourth figure in paper
-ax16.set_title(r'Smoothed $\frac{\textrm{d}\beta}{\textrm{d}\frac{S}{N}}$ as the UK transitioned into its first lockdown')
+ax16.set_title(r'Smoothed $\frac{\textrm{d}\beta}{\textrm{d}s}$ as the UK transitioned into its first lockdown')
 fig16.savefig("fig16.png")
 
 
@@ -928,7 +950,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(lockdownlowvaxhigh[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with a high vaccination rate')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with a medium vaccination rate')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with a low vaccination rate')
@@ -964,7 +985,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(lockdownmedvaxhigh[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with a high vaccination rate')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with a medium vaccination rate')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with a low vaccination rate')
@@ -1001,7 +1021,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(lockdownhighvaxhigh[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with a high vaccination rate')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with a medium vaccination rate')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with a low vaccination rate')
@@ -1039,7 +1058,6 @@ for t, y in enumerate(emhl):
     emhl[t] = np.nanmean(lockdownhighvaxlow[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(emhl, 28), alpha=0.5, lw=2, label='Countries with high lockdown stringency')
 axLV.plot(dates, smooth(emml, 28), alpha=0.5, lw=2, label='Countries with medium lockdown stringency')
 axLV.plot(dates, smooth(emll, 28), alpha=0.5, lw=2, label='Countries with low lockdown stringency')
@@ -1075,7 +1093,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(lockdownhighvaxmed[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low lockdown stringency')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium lockdown stringency')
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high lockdown stringency')
@@ -1112,7 +1129,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(lockdownhighvaxhigh[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low lockdown stringency')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium lockdown stringency')
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high lockdown stringency')
@@ -1150,7 +1166,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(maskshighvaxlow[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
@@ -1186,7 +1201,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(maskshighvaxmed[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
@@ -1222,7 +1236,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(maskshighvaxhigh[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with high mask stringency')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium mask stringency')
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with low mask stringency')
@@ -1258,7 +1271,6 @@ for t, y in enumerate(em3):
     em3[t] = np.nanmean(coviddeathslowvaxlow[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(em1, 28), alpha=0.5, lw=2, label='Countries with high vaccination rates')
 axLV.plot(dates, smooth(em2, 28), alpha=0.5, lw=2, label='Countries with medium vaccination rates')
 axLV.plot(dates, smooth(em3, 28), alpha=0.5, lw=2, label='Countries with low vaccination rates')
@@ -1294,7 +1306,6 @@ for t, y in enumerate(em3):
     eml[t] = np.nanmean(coviddeathsmedvaxlow[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Countries with high vaccination rates')
 axLV.plot(dates, smooth(emm, 28), alpha=0.5, lw=2, label='Countries with medium vaccination rates')
 axLV.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Countries with low vaccination rates')
@@ -1330,7 +1341,6 @@ for t, y in enumerate(em3):
     eml[t] = np.nanmean(coviddeathshighvaxlow[t], axis=0)
 figLV = plt.figure(facecolor='w')
 axLV = figLV.add_subplot(111, axisbelow=True)
-axLV._get_lines.prop_cycler = axLV._get_lines.prop_cycler
 axLV.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Highly-vaccinated countries')
 axLV.plot(dates, smooth(emm, 28), alpha=0.5, lw=2, label='Medium-vaccinated countries')
 axLV.plot(dates, smooth(eml, 28), alpha=0.5, lw=2, label='Low-vaccinated countries')
@@ -1372,7 +1382,6 @@ for t, y in enumerate(emllh):
     emllh[t] = np.nanmean(coviddeathslowlockdownlowvaxhigh[t], axis=0)
 figCDLV = plt.figure(facecolor='w')
 axCDLV = figCDLV.add_subplot(111, axisbelow=True)
-axCDLV._get_lines.prop_cycler = axCDLV._get_lines.prop_cycler
 axCDLV.plot(dates, smooth(emlll, 28), alpha=0.5, lw=2, label='COVID-19 death rate low, lockdown stringency low, vaccination rate low')
 axCDLV.plot(dates, smooth(emhll, 28), alpha=0.5, lw=2, label='COVID-19 death rate high, lockdown stringency low, vaccination rate low')
 axCDLV.plot(dates, smooth(emlhl, 28), alpha=0.5, lw=2, label='COVID-19 death rate low, lockdown stringency high, vaccination rate low')
@@ -1419,7 +1428,7 @@ for t, y in enumerate(eml):
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 p1 = ax19.plot(dates, smooth(cdh, 28), alpha=0.5, lw=2, label='COVID-19 death rate for countries with a high COVID-19 death rate')
 p2 = ax19.plot(dates, smooth(cdl, 28), alpha=0.5, lw=2, label='COVID-19 death rate for countries with a low COVID-19 death rate')
 p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality for countries with high COVID-19 death rate')
@@ -1468,7 +1477,7 @@ for t, y in enumerate(eml):
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 p1 = ax19.plot(dates, smooth(ldh, 28), alpha=0.5, lw=2, label='Lockdown stringency in high-stringency countries')
 p2 = ax19.plot(dates, smooth(ldl, 28), alpha=0.5, lw=2, label='Lockdown stringency in low-stringency countries')
 p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality in high-stringency countries')
@@ -1518,7 +1527,7 @@ for t, y in enumerate(eml):
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 p1 = ax19.plot(dates, smooth(mh, 28), alpha=0.5, lw=2, label='Mask index in high mask stringency countries')
 p2 = ax19.plot(dates, smooth(ml, 28), alpha=0.5, lw=2, label='Mask index in low mask stringency countries')
 p3 = ax20.plot(dates, smooth(emh, 28), alpha=0.5, lw=2, label='Excess mortality in high mask stringency countries')
@@ -1575,7 +1584,7 @@ for t, y in enumerate(cdl):
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 p1 = ax19.plot(dates, smooth(vh, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
 p2 = ax19.plot(dates, smooth(vm, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
 p3 = ax19.plot(dates, smooth(vl, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
@@ -1615,7 +1624,7 @@ for c, d in enumerate(numclust):
         fig19 = plt.figure(facecolor='w')
         ax19 = fig19.add_subplot(111, axisbelow=True)
         ax20 = ax19.twinx()
-        ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+        sync_colour_cycle(ax20, ax19)
         if vaxhighvx.size > 0:
             cd1 = np.empty(len(dates))
             cd1[:] = np.nan
@@ -1682,7 +1691,7 @@ for c, d in enumerate(numclust):
         fig19 = plt.figure(facecolor='w')
         ax19 = fig19.add_subplot(111, axisbelow=True)
         ax20 = ax19.twinx()
-        ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+        sync_colour_cycle(ax20, ax19)
         if vaxhighvx.size > 0:
             em1 = np.empty(len(dates))
             em1[:] = np.nan
@@ -1774,7 +1783,7 @@ for t, y in enumerate(eml):
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 p1 = ax19.plot(dates, smooth(vh, 28), alpha=0.5, lw=2, label='Vaccination rate in highly-vaccinated countries')
 p2 = ax19.plot(dates, smooth(vm, 28), alpha=0.5, lw=2, label='Vaccination rate in medium-vaccinated countries')
 p3 = ax19.plot(dates, smooth(vl, 28), alpha=0.5, lw=2, label='Vaccination rate in low-vaccinated countries')
@@ -1882,7 +1891,7 @@ for i, c in enumerate(countries):
         if not all(val == 0 for val in CNTRYexcessmortality0):
             axem = axc.twinx()
             CNTRY5 = axem.plot(dates, smooth(CNTRYexcessmortality, 28), alpha=0.5, lw=2, label='Excess mortality', color='r')
-            axem._get_lines.prop_cycler = axc._get_lines.prop_cycler
+            sync_colour_cycle(axem, axc)
             axem.set_ylabel('Excess mortality P-scores')
             lines, labels = axc.get_legend_handles_labels()
             lines2, labels2 = axem.get_legend_handles_labels()
@@ -1916,7 +1925,7 @@ deaths_GBR = [row[4] for row in SWEGBRdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 SWEl = ax19.plot(dates, lockdown_SWE, alpha=0.5, lw=2, label='Sweden')
 GBRl = ax19.plot(dates, lockdown_GBR, alpha=0.5, lw=2, label='UK')
 SWEem = ax20.plot(dates, smooth(deaths_SWE, 28), alpha=0.5, lw=2, label='Sweden')
@@ -1954,7 +1963,7 @@ deaths_EGY = [row[4] for row in DZAEGYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
 EGYv = ax19.plot(dates, smooth(vax_EGY, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
 DZAcd = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda COVID-19 death rate')
@@ -1986,7 +1995,7 @@ deaths_EGY = [row[4] for row in DZAEGYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DZAv = ax19.plot(dates, smooth(vax_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
 EGYv = ax19.plot(dates, smooth(vax_EGY, 28), alpha=0.5, lw=2, label='Egypt vaccination rate')
 DZAem = ax20.plot(dates, smooth(deaths_DZA, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
@@ -2018,7 +2027,7 @@ deaths_CUB = [row[4] for row in ATGCUBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ATGv = ax19.plot(dates, smooth(vax_ATG, 28), alpha=0.5, lw=2, label='Antigua and Barbuda vaccination rate')
 CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
 ATGem = ax20.plot(dates, smooth(deaths_ATG, 28), alpha=0.5, lw=2, label='Antigua and Barbuda excess mortality')
@@ -2050,7 +2059,7 @@ deaths_PRY = [row[4] for row in ARGPRYdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ARGv = ax19.plot(dates, smooth(vax_ARG, 28), alpha=0.5, lw=2, label='Argentina vaccination rate')
 PRYv = ax19.plot(dates, smooth(vax_PRY, 28), alpha=0.5, lw=2, label='Paraguay vaccination rate')
 ARGem = ax20.plot(dates, smooth(deaths_ARG, 28), alpha=0.5, lw=2, label='Argentina excess mortality')
@@ -2082,7 +2091,7 @@ deaths_AZE = [row[4] for row in ARMAZEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ARMv = ax19.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
 AZEv = ax19.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
 ARMcd = ax20.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia COVID-19 death rate')
@@ -2114,7 +2123,7 @@ deaths_AZE = [row[4] for row in ARMAZEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ARMv = ax19.plot(dates, smooth(vax_ARM, 28), alpha=0.5, lw=2, label='Armenia vaccination rate')
 AZEv = ax19.plot(dates, smooth(vax_AZE, 28) , alpha=0.5, lw=2, label='Azerbaijan vaccination rate')
 ARMem = ax20.plot(dates, smooth(deaths_ARM, 28), alpha=0.5, lw=2, label='Armenia excess mortality')
@@ -2146,7 +2155,7 @@ deaths_NZL = [row[4] for row in AUSNZLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 AUSv = ax19.plot(dates, smooth(vax_AUS, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
 NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
 AUScd = ax20.plot(dates, smooth(deaths_AUS, 28), alpha=0.5, lw=2, label='Australia COVID-19 death rate')
@@ -2178,7 +2187,7 @@ deaths_NZL = [row[4] for row in AUSNZLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 AUSv = ax19.plot(dates, smooth(vax_AUS, 28), alpha=0.5, lw=2, label='Australia vaccination rate')
 NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
 AUSem = ax20.plot(dates, smooth(deaths_AUS, 28), alpha=0.5, lw=2, label='Australia excess mortality')
@@ -2210,7 +2219,7 @@ deaths_DNK = [row[4] for row in BLRDNKdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BLRv = ax19.plot(dates, smooth(vax_BLR, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 BLRcd = ax20.plot(dates, smooth(deaths_BLR, 28), alpha=0.5, lw=2, label='Belarus COVID-19 death rate')
@@ -2242,7 +2251,7 @@ deaths_DNK = [row[4] for row in BLRDNKdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BLRv = ax19.plot(dates, smooth(vax_BLR, 28), alpha=0.5, lw=2, label='Belarus vaccination rate')
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 BLRem = ax20.plot(dates, smooth(deaths_BLR, 28), alpha=0.5, lw=2, label='Belarus excess mortality')
@@ -2274,7 +2283,7 @@ deaths_SGP = [row[4] for row in BTNSGPdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
 SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
 BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
@@ -2306,7 +2315,7 @@ deaths_VNM = [row[4] for row in BTNVNMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
 VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
 BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
@@ -2338,7 +2347,7 @@ deaths_SGP = [row[4] for row in BTNSGPdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
 SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
 BTNem = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
@@ -2370,7 +2379,7 @@ deaths_THA = [row[4] for row in BTNTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 BTNcd = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan COVID-19 death rate')
@@ -2402,7 +2411,7 @@ deaths_THA = [row[4] for row in BTNTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BTNv = ax19.plot(dates, smooth(vax_BTN, 28), alpha=0.5, lw=2, label='Bhutan vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 BTNem = ax20.plot(dates, smooth(deaths_BTN, 28), alpha=0.5, lw=2, label='Bhutan excess mortality')
@@ -2434,7 +2443,7 @@ deaths_ROU = [row[4] for row in BIHROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BIHv = ax19.plot(dates, smooth(vax_BIH, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina vaccination rate')
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
 BIHem = ax20.plot(dates, smooth(deaths_BIH, 28), alpha=0.5, lw=2, label='Bosnia and Herzegovina excess mortality')
@@ -2466,7 +2475,7 @@ deaths_SRB = [row[4] for row in BGRSRBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BGRv = ax19.plot(dates, smooth(vax_BGR, 28), alpha=0.5, lw=2, label='Bulgaria vaccination rate')
 SRBv = ax19.plot(dates, smooth(vax_SRB, 28), alpha=0.5, lw=2, label='Serbia vaccination rate')
 BGRem = ax20.plot(dates, smooth(deaths_BGR, 28), alpha=0.5, lw=2, label='Bulgaria excess mortality')
@@ -2498,7 +2507,7 @@ deaths_ERI = [row[4] for row in BDIERIdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BDIv = ax19.plot(dates, smooth(vax_BDI, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
 ERIv = ax19.plot(dates, smooth(vax_ERI, 28) , alpha=0.5, lw=2, label='Eritrea vaccination rate')
 BDIcd = ax20.plot(dates, smooth(deaths_BDI, 28), alpha=0.5, lw=2, label='Burundi COVID-19 death rate')
@@ -2530,7 +2539,7 @@ deaths_SYC = [row[4] for row in BDISYCdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 BDIv = ax19.plot(dates, smooth(vax_BDI, 28), alpha=0.5, lw=2, label='Burundi vaccination rate')
 SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
 BDIcd = ax20.plot(dates, smooth(deaths_BDI, 28), alpha=0.5, lw=2, label='Burundi COVID-19 death rate')
@@ -2562,7 +2571,7 @@ deaths_VNM = [row[4] for row in KHMVNMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 KHMv = ax19.plot(dates, smooth(vax_KHM, 28), alpha=0.5, lw=2, label='Cambodia vaccination rate')
 VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
 KHMcd = ax20.plot(dates, smooth(deaths_KHM, 28), alpha=0.5, lw=2, label='Cambodia COVID-19 death rate')
@@ -2594,7 +2603,7 @@ deaths_CUB = [row[4] for row in CANCUBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CANv = ax19.plot(dates, smooth(vax_CAN, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
 CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
 CANem = ax20.plot(dates, smooth(deaths_CAN, 28), alpha=0.5, lw=2, label='Canada excess mortality')
@@ -2626,7 +2635,7 @@ deaths_VCT = [row[4] for row in CANVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CANv = ax19.plot(dates, smooth(vax_CAN, 28), alpha=0.5, lw=2, label='Canada vaccination rate')
 VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
 CANem = ax20.plot(dates, smooth(deaths_CAN, 28), alpha=0.5, lw=2, label='Canada excess mortality')
@@ -2658,7 +2667,7 @@ deaths_TUN = [row[4] for row in CPVTUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CPVv = ax19.plot(dates, smooth(vax_CPV, 28), alpha=0.5, lw=2, label='Cape Verde vaccination rate')
 TUNv = ax19.plot(dates, smooth(vax_TUN, 28), alpha=0.5, lw=2, label='Tunisia vaccination rate')
 CPVem = ax20.plot(dates, smooth(deaths_CPV, 28), alpha=0.5, lw=2, label='Cape Verde excess mortality')
@@ -2692,7 +2701,7 @@ deaths_HUNs = smooth(deaths_HUN, 7)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVcd = ax20.plot(dates, smooth(deaths_HRVs, 28), alpha=0.5, lw=2, label='Croatia COVID-19 death rate')
@@ -2726,7 +2735,7 @@ deaths_HUNs = smooth(deaths_HUN, 7)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVcd = ax20.plot(dates, smooth(deaths_HRVs, 28), alpha=0.5, lw=2, label='Croatia COVID-19 death rate')
@@ -2765,7 +2774,7 @@ deaths_diff = np.subtract(deaths_HUNs, deaths_HRVs)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate minus Croatia COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million')
@@ -2797,7 +2806,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -2833,7 +2842,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -2867,7 +2876,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -2900,7 +2909,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -2937,7 +2946,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
@@ -2973,7 +2982,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3010,7 +3019,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3047,7 +3056,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
@@ -3082,7 +3091,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3115,7 +3124,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3154,7 +3163,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate minus Croatia COVID-19 death rate')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
@@ -3188,7 +3197,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3221,7 +3230,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3257,7 +3266,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary COVID-19 excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
@@ -3289,7 +3298,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3322,7 +3331,7 @@ deaths_HUN = [row[4] for row in HRVHUNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVv = ax19.plot(dates, smooth(vax_HRV, 28), alpha=0.5, lw=2, label='Croatia vaccination rate')
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 HRVem = ax20.plot(dates, smooth(deaths_HRV, 28), alpha=0.5, lw=2, label='Croatia excess mortality')
@@ -3358,7 +3367,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNcd = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million (all ages)')
@@ -3395,7 +3404,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
@@ -3427,7 +3436,7 @@ deaths_diff = np.subtract(deaths_HUN, deaths_HRV)
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HRVHUNv = ax19.plot(dates, smooth(vax_diff, 28), alpha=0.5, lw=2, label='Hungary vaccination rate minus Croatia vaccination rate')
 HRVHUNem = ax20.plot(dates, smooth(deaths_diff, 28), alpha=0.5, lw=2, label='Hungary excess mortality minus Croatia excess mortality')
 ax19.set_ylabel('Daily vaccination doses per million')
@@ -3464,7 +3473,7 @@ deaths_JAM = [row[4] for row in CUBJAMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
 JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
 CUBcd = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba COVID-19 death rate')
@@ -3496,7 +3505,7 @@ deaths_JAM = [row[4] for row in CUBJAMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
 JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
 CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
@@ -3528,7 +3537,7 @@ deaths_VCT = [row[4] for row in CUBVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 CUBv = ax19.plot(dates, smooth(vax_CUB, 28), alpha=0.5, lw=2, label='Cuba vaccination rate')
 VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
 CUBem = ax20.plot(dates, smooth(deaths_CUB, 28), alpha=0.5, lw=2, label='Cuba excess mortality')
@@ -3560,7 +3569,7 @@ deaths_FIN = [row[4] for row in DNKFINdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 FINv = ax19.plot(dates, smooth(vax_FIN, 28), alpha=0.5, lw=2, label='Finland vaccination rate')
 DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
@@ -3592,7 +3601,7 @@ deaths_DEU = [row[4] for row in DNKDEUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 DEUv = ax19.plot(dates, smooth(vax_DEU, 28), alpha=0.5, lw=2, label='Germany vaccination rate')
 DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
@@ -3624,7 +3633,7 @@ deaths_NOR = [row[4] for row in DNKNORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
 DNKcd = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark COVID-19 death rate')
@@ -3656,7 +3665,7 @@ deaths_NOR = [row[4] for row in DNKNORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DNKv = ax19.plot(dates, smooth(vax_DNK, 28), alpha=0.5, lw=2, label='Denmark vaccination rate')
 NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
 DNKem = ax20.plot(dates, smooth(deaths_DNK, 28), alpha=0.5, lw=2, label='Denmark excess mortality')
@@ -3688,7 +3697,7 @@ deaths_HTI = [row[4] for row in DOMHTIdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 DOMv = ax19.plot(dates, smooth(vax_DOM, 28), alpha=0.5, lw=2, label='Dominican Republic vaccination rate')
 HTIv = ax19.plot(dates, smooth(vax_HTI, 28), alpha=0.5, lw=2, label='Haiti vaccination rate')
 DOMcd = ax20.plot(dates, smooth(deaths_DOM, 28), alpha=0.5, lw=2, label='Dominican Republic COVID-19 death rate')
@@ -3720,7 +3729,7 @@ deaths_NOR = [row[4] for row in FRONORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 FROv = ax19.plot(dates, smooth(vax_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands vaccination rate')
 NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
 FROcd = ax20.plot(dates, smooth(deaths_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands COVID-19 death rate')
@@ -3752,7 +3761,7 @@ deaths_NOR = [row[4] for row in FRONORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 FROv = ax19.plot(dates, smooth(vax_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands vaccination rate')
 NORv = ax19.plot(dates, smooth(vax_NOR, 28), alpha=0.5, lw=2, label='Norway vaccination rate')
 FROem = ax20.plot(dates, smooth(deaths_FRO, 28), alpha=0.5, lw=2, label='Faroe Islands excess mortality')
@@ -3784,7 +3793,7 @@ deaths_NZL = [row[4] for row in PYFNZLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 PYFv = ax19.plot(dates, smooth(vax_PYF, 28), alpha=0.5, lw=2, label='French Polynesia vaccination rate')
 NZLv = ax19.plot(dates, smooth(vax_NZL, 28), alpha=0.5, lw=2, label='New Zealand vaccination rate')
 PYFem = ax20.plot(dates, smooth(deaths_PYF, 28), alpha=0.5, lw=2, label='French Polynesia excess mortality')
@@ -3816,7 +3825,7 @@ deaths_IND = [row[4] for row in GIBINDdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 GIBv = ax19.plot(dates, smooth(vax_GIB, 28), alpha=0.5, lw=2, label='Gibraltar vaccination rate')
 INDv = ax19.plot(dates, smooth(vax_IND, 28), alpha=0.5, lw=2, label='India vaccination rate')
 GIBcd = ax20.plot(dates, smooth(deaths_GIB, 28), alpha=0.5, lw=2, label='Gibraltar COVID-19 death rate')
@@ -3848,7 +3857,7 @@ deaths_MAC = [row[4] for row in HKGMACdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
 MACv = ax19.plot(dates, smooth(vax_MAC, 28), alpha=0.5, lw=2, label='Macao vaccination rate')
 HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
@@ -3880,7 +3889,7 @@ deaths_PHL = [row[4] for row in HKGPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
 PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
 HKGcd = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong COVID-19 death rate')
@@ -3912,7 +3921,7 @@ deaths_PHL = [row[4] for row in HKGPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
 PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
 HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
@@ -3944,7 +3953,7 @@ deaths_KOR = [row[4] for row in HKGKORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HKGv = ax19.plot(dates, smooth(vax_HKG, 28), alpha=0.5, lw=2, label='Hong Kong vaccination rate')
 KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
 HKGem = ax20.plot(dates, smooth(deaths_HKG, 28), alpha=0.5, lw=2, label='Hong Kong excess mortality')
@@ -3976,7 +3985,7 @@ deaths_ROU = [row[4] for row in HUNROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
 HUNcd = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary COVID-19 death rate')
@@ -4008,7 +4017,7 @@ deaths_ROU = [row[4] for row in HUNROUdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 HUNv = ax19.plot(dates, smooth(vax_HUN, 28), alpha=0.5, lw=2, label='Hungary vaccination rate')
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
 HUNem = ax20.plot(dates, smooth(deaths_HUN, 28), alpha=0.5, lw=2, label='Hungary excess mortality')
@@ -4040,7 +4049,7 @@ deaths_PHL = [row[4] for row in IDNPHLdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 IDNv = ax19.plot(dates, smooth(vax_IDN, 28), alpha=0.5, lw=2, label='Indonesia vaccination rate')
 PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
 IDNcd = ax20.plot(dates, smooth(deaths_IDN, 28), alpha=0.5, lw=2, label='Indonesia COVID-19 death rate')
@@ -4072,7 +4081,7 @@ deaths_OMN = [row[4] for row in IRQOMNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 IRQv = ax19.plot(dates, smooth(vax_IRQ, 28), alpha=0.5, lw=2, label='Iraq vaccination rate')
 OMNv = ax19.plot(dates, smooth(vax_OMN, 28), alpha=0.5, lw=2, label='Oman vaccination rate')
 IRQcd = ax20.plot(dates, smooth(deaths_IRQ, 28), alpha=0.5, lw=2, label='Iraq COVID-19 death rate')
@@ -4104,7 +4113,7 @@ deaths_PRT = [row[4] for row in JAMPRTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
 PRTv = ax19.plot(dates, smooth(vax_PRT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
 JAMcd = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica COVID-19 death rate')
@@ -4136,7 +4145,7 @@ deaths_VCT = [row[4] for row in JAMVCTdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 JAMv = ax19.plot(dates, smooth(vax_JAM, 28), alpha=0.5, lw=2, label='Jamaica vaccination rate')
 VCTv = ax19.plot(dates, smooth(vax_VCT, 28), alpha=0.5, lw=2, label='Saint Vincent and the Grenadines vaccination rate')
 JAMem = ax20.plot(dates, smooth(deaths_JAM, 28), alpha=0.5, lw=2, label='Jamaica excess mortality')
@@ -4168,7 +4177,7 @@ deaths_MYS = [row[4] for row in JPNMYSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 JPNv = ax19.plot(dates, smooth(vax_JPN, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
 MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
 JPNem = ax20.plot(dates, smooth(deaths_JPN, 28), alpha=0.5, lw=2, label='Japan excess mortality')
@@ -4200,7 +4209,7 @@ deaths_KOR = [row[4] for row in JPNKORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 JPNv = ax19.plot(dates, smooth(vax_JPN, 28), alpha=0.5, lw=2, label='Japan vaccination rate')
 KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
 JPNem = ax20.plot(dates, smooth(deaths_JPN, 28), alpha=0.5, lw=2, label='Japan excess mortality')
@@ -4232,7 +4241,7 @@ deaths_UZB = [row[4] for row in KGZUZBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 KGZv = ax19.plot(dates, smooth(vax_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan vaccination rate')
 UZBv = ax19.plot(dates, smooth(vax_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
 KGZcd = ax20.plot(dates, smooth(deaths_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan COVID-19 death rate')
@@ -4264,7 +4273,7 @@ deaths_UZB = [row[4] for row in KGZUZBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 KGZv = ax19.plot(dates, smooth(vax_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan vaccination rate')
 UZBv = ax19.plot(dates, smooth(vax_UZB, 28), alpha=0.5, lw=2, label='Uzbekistan vaccination rate')
 KGZem = ax20.plot(dates, smooth(deaths_KGZ, 28), alpha=0.5, lw=2, label='Kyrgyzstan excess mortality')
@@ -4296,7 +4305,7 @@ deaths_UKR = [row[4] for row in LVAUKRdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 LVAv = ax19.plot(dates, smooth(vax_LVA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
 UKRv = ax19.plot(dates, smooth(vax_UKR, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
 LVAcd = ax20.plot(dates, smooth(deaths_LVA, 28), alpha=0.5, lw=2, label='Latvia COVID-19 death rate')
@@ -4328,7 +4337,7 @@ deaths_UKR = [row[4] for row in LVAUKRdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 LVAv = ax19.plot(dates, smooth(vax_LVA, 28), alpha=0.5, lw=2, label='Latvia vaccination rate')
 UKRv = ax19.plot(dates, smooth(vax_UKR, 28), alpha=0.5, lw=2, label='Ukraine vaccination rate')
 LVAem = ax20.plot(dates, smooth(deaths_LVA, 28), alpha=0.5, lw=2, label='Latvia excess mortality')
@@ -4360,7 +4369,7 @@ deaths_PSE = [row[4] for row in LBNPSEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 LBNv = ax19.plot(dates, smooth(vax_LBN, 28), alpha=0.5, lw=2, label='Lebanon vaccination rate')
 PSEv = ax19.plot(dates, smooth(vax_PSE, 28), alpha=0.5, lw=2, label='Palestine vaccination rate')
 LBNem = ax20.plot(dates, smooth(deaths_LBN, 28), alpha=0.5, lw=2, label='Lebanon excess mortality')
@@ -4392,7 +4401,7 @@ deaths_MNG = [row[4] for row in MYSMNGdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
 MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
 MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
@@ -4424,7 +4433,7 @@ deaths_TWN = [row[4] for row in MYSTWNdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
 TWNv = ax19.plot(dates, smooth(vax_TWN, 28), alpha=0.5, lw=2, label='Taiwan vaccination rate')
 MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
@@ -4456,7 +4465,7 @@ deaths_THA = [row[4] for row in MYSTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 MYScd = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia COVID-19 death rate')
@@ -4488,7 +4497,7 @@ deaths_THA = [row[4] for row in MYSTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MYSv = ax19.plot(dates, smooth(vax_MYS, 28), alpha=0.5, lw=2, label='Malaysia vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 MYSem = ax20.plot(dates, smooth(deaths_MYS, 28), alpha=0.5, lw=2, label='Malaysia excess mortality')
@@ -4520,7 +4529,7 @@ deaths_SYC = [row[4] for row in MUSSYCdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MUSv = ax19.plot(dates, smooth(vax_MUS, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
 SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
 MUScd = ax20.plot(dates, smooth(deaths_MUS, 28), alpha=0.5, lw=2, label='Mauritius COVID-19 death rate')
@@ -4552,7 +4561,7 @@ deaths_SYC = [row[4] for row in MUSSYCdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MUSv = ax19.plot(dates, smooth(vax_MUS, 28), alpha=0.5, lw=2, label='Mauritius vaccination rate')
 SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
 MUSem = ax20.plot(dates, smooth(deaths_MUS, 28), alpha=0.5, lw=2, label='Mauritius excess mortality')
@@ -4584,7 +4593,7 @@ deaths_THA = [row[4] for row in MNGTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 MNGcd = ax20.plot(dates, smooth(deaths_MNG, 28), alpha=0.5, lw=2, label='Mongolia COVID-19 death rate')
@@ -4616,7 +4625,7 @@ deaths_THA = [row[4] for row in MNGTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 MNGv = ax19.plot(dates, smooth(vax_MNG, 28), alpha=0.5, lw=2, label='Mongolia vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 MNGem = ax20.plot(dates, smooth(deaths_MNG, 28), alpha=0.5, lw=2, label='Mongolia excess mortality')
@@ -4648,7 +4657,7 @@ deaths_SLB = [row[4] for row in PNGSLBdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 PNGv = ax19.plot(dates, smooth(vax_PNG, 28), alpha=0.5, lw=2, label='Papua New Guinea vaccination rate')
 SLBv = ax19.plot(dates, smooth(vax_SLB, 28), alpha=0.5, lw=2, label='Solomon Islands vaccination rate')
 PNGcd = ax20.plot(dates, smooth(deaths_PNG, 28), alpha=0.5, lw=2, label='Papua New Guinea COVID-19 death rate')
@@ -4680,7 +4689,7 @@ deaths_KOR = [row[4] for row in PHLKORdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 PHLv = ax19.plot(dates, smooth(vax_PHL, 28), alpha=0.5, lw=2, label='Philippines vaccination rate')
 KORv = ax19.plot(dates, smooth(vax_KOR, 28), alpha=0.5, lw=2, label='South Korea vaccination rate')
 PHLem = ax20.plot(dates, smooth(deaths_PHL, 28), alpha=0.5, lw=2, label='Philippines excess mortality')
@@ -4712,7 +4721,7 @@ deaths_RUS = [row[4] for row in ROURUSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
 RUSv = ax19.plot(dates, smooth(vax_RUS, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
 ROUcd = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania COVID-19 death rate')
@@ -4744,7 +4753,7 @@ deaths_RUS = [row[4] for row in ROURUSdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ROUv = ax19.plot(dates, smooth(vax_ROU, 28), alpha=0.5, lw=2, label='Romania vaccination rate')
 RUSv = ax19.plot(dates, smooth(vax_RUS, 28), alpha=0.5, lw=2, label='Russia vaccination rate')
 ROUem = ax20.plot(dates, smooth(deaths_ROU, 28), alpha=0.5, lw=2, label='Romania excess mortality')
@@ -4776,7 +4785,7 @@ deaths_UGA = [row[4] for row in RWAUGAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 RWAv = ax19.plot(dates, smooth(vax_RWA, 28), alpha=0.5, lw=2, label='Rwanda vaccination rate')
 UGAv = ax19.plot(dates, smooth(vax_UGA, 28), alpha=0.5, lw=2, label='Uganda vaccination rate')
 RWAcd = ax20.plot(dates, smooth(deaths_RWA, 28), alpha=0.5, lw=2, label='Rwanda COVID-19 death rate')
@@ -4808,7 +4817,7 @@ deaths_TZA = [row[4] for row in SYCTZAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 SYCv = ax19.plot(dates, smooth(vax_SYC, 28), alpha=0.5, lw=2, label='Seychelles vaccination rate')
 TZAv = ax19.plot(dates, smooth(vax_TZA, 28), alpha=0.5, lw=2, label='Tanzania vaccination rate')
 SYCcd = ax20.plot(dates, smooth(deaths_SYC, 28), alpha=0.5, lw=2, label='Seychelles COVID-19 death rate')
@@ -4840,7 +4849,7 @@ deaths_THA = [row[4] for row in SGPTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 SGPcd = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore COVID-19 death rate')
@@ -4872,7 +4881,7 @@ deaths_THA = [row[4] for row in SGPTHAdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 SGPv = ax19.plot(dates, smooth(vax_SGP, 28), alpha=0.5, lw=2, label='Singapore vaccination rate')
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 SGPem = ax20.plot(dates, smooth(deaths_SGP, 28), alpha=0.5, lw=2, label='Singapore excess mortality')
@@ -4904,7 +4913,7 @@ deaths_VNM = [row[4] for row in THAVNMdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 THAv = ax19.plot(dates, smooth(vax_THA, 28), alpha=0.5, lw=2, label='Thailand vaccination rate')
 VNMv = ax19.plot(dates, smooth(vax_VNM, 28), alpha=0.5, lw=2, label='Vietnam vaccination rate')
 THAcd = ax20.plot(dates, smooth(deaths_THA, 28), alpha=0.5, lw=2, label='Thailand COVID-19 death rate')
@@ -4936,7 +4945,7 @@ deaths_ZWE = [row[4] for row in ZMBZWEdata]
 fig19 = plt.figure(facecolor='w')
 ax19 = fig19.add_subplot(111, axisbelow=True)
 ax20 = ax19.twinx()
-ax20._get_lines.prop_cycler = ax19._get_lines.prop_cycler
+sync_colour_cycle(ax20, ax19)
 ZMBv = ax19.plot(dates, smooth(vax_ZMB, 28), alpha=0.5, lw=2, label='Zambia vaccination rate')
 ZWEv = ax19.plot(dates, smooth(vax_ZWE, 28), alpha=0.5, lw=2, label='Zimbabwe vaccination rate')
 ZMBcd = ax20.plot(dates, smooth(deaths_ZMB, 28), alpha=0.5, lw=2, label='Zambia COVID-19 death rate')
@@ -5253,23 +5262,211 @@ f.write('\n')
 f.write('\n')
 
 f.write('Statistic 1\n')
-f.write('UK Gompertz function growth-rate coefficient during the lockdown minus the equivalent for Sweden.\n')
-f.write('If the UK lockdown worked, this number should be negative and significantly different from zero.\n')
+f.write('UK Gompertz function growth-rate coefficient during the lockdown minus the equivalent for Sweden (both per day).\n')
+f.write('If the UK lockdown worked, this number should be negative. A moving-block bootstrap 95% confidence interval is reported at the end of this file.\n')
 f.write(str(r_UKlockdown - r_SElockdown))
 f.write('\n')
 f.write('\n')
 
 f.write('Statistic 2\n')
-f.write('Change in beta relative to the proportion of the population that is susceptible in the UK during the transition from before the lockdown to during the lockdown minus the equivalent for Sweden.\n')
-f.write('If the UK lockdown worked, this number should be positive and significantly different from zero.\n')
+f.write('Mean difference between d(beta)/ds for the UK and the matched Sweden control over infection dates 28 February 2020 to 17 April 2020 (50 days), where s = 100*S/N is the percentage of the population susceptible, so the units are per percentage point of s. 12-day-smoothed series; the control is smoothed after being matched onto UK dates.\n')
+f.write('If the UK lockdown worked, this number should be positive. A moving-block bootstrap 95% confidence interval is reported at the end of this file.\n')
 f.write(str(statistics.mean(epi_dbetadS1_UK_smoothed[25:74+1]) - statistics.mean(control_smoothed[25:74+1])))
+f.write('\n')
+f.write('Statistic 2 without the 12-day smoothing: ')
+f.write(str(statistics.mean(epi_dbetadS1_UK[25:74+1]) - statistics.mean(control[25:74+1])))
 f.write('\n')
 f.write('\n')
 
 f.write('Statistic 3\n')
-f.write('Change in beta in England between 29 June 2020 and 17 August 2020, minus the equivalent for Sweden.\n')
-f.write('If the mask policy was effective, this number should be negative and significantly different from zero.\n')
+f.write('Change in 12-day-smoothed beta in England between infection dates 29 June 2020 and 17 August 2020, minus the equivalent for Sweden (infection dates 8 July 2020 and 26 August 2020; the two series are aligned on each country\'s first death).\n')
+f.write('If the mask policy was effective, this number should be negative. A moving-block bootstrap 95% confidence interval is reported at the end of this file.\n')
 f.write(str((beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[196] - beta_SE_smoothed[147])))
+f.write('\n')
+f.write('Statistic 3 without the 12-day smoothing: ')
+f.write(str((beta_EN[196] - beta_EN[147]) - (beta_SE[196] - beta_SE[147])))
+
+
+####################################
+# Bootstrap Uncertainty Analysis   #
+####################################
+# Moving-block bootstrap on the daily deaths series, propagated through the full
+# pipeline, giving percentile confidence intervals for Statistics 1-3.
+# Method: for each country, take the 7-day moving average of daily deaths as the
+# trend m_t; form Pearson-scaled residuals e_t = (y_t - m_t)/sqrt(max(m_t, 1));
+# resample the residuals in weekday-aligned moving blocks of BOOT_BLOCK days;
+# reconstruct synthetic deaths y*_t = round(max(0, m_t + sqrt(max(m_t, 1))*e*_t));
+# and recompute the entire pipeline (7-day smoothing, inference of infections,
+# SIR reconstruction, Gompertz fits with re-estimated peak alignment, beta,
+# matching of the Sweden control, 12-day smoothing) and the three statistics on
+# each replicate.  The intervals quantify sampling/reporting noise conditional
+# on the modelling choices (the IFR, the 35% pre-existing-immunity assumption,
+# the 27-day infection-to-death lag and the matching designs); they do not
+# capture uncertainty in those choices themselves.
+# The UK, Sweden and England series are resampled independently; no statistic
+# combines the UK and England series, so their overlap is immaterial.
+# Conclusions are unchanged for block lengths of 7, 21 and 28 days.
+
+BOOT_B = 10000   # bootstrap replicates
+BOOT_BLOCK = 14  # block length in days (two weekly cycles)
+BOOT_SEED = 0    # for reproducibility
+
+boot_rng = np.random.default_rng(BOOT_SEED)
+boot_deaths_UK = np.asarray(deaths_UK, dtype=float)
+boot_deaths_SE = np.asarray(deaths_SE, dtype=float)
+boot_deaths_EN = np.asarray(deaths_EN, dtype=float)
+
+def boot_gompertz(tt, A, r, t0):
+    return A*r*np.exp(-np.exp(-r*(tt-t0))-r*(tt-t0))
+
+def boot_fit3(y, guess, fallback):
+    tt = np.arange(len(y))
+    def sse(p):
+        return np.sum((y - boot_gompertz(tt, p[0], p[1], p[2]))**2)
+    res = optimize.minimize(sse, guess, method='Nelder-Mead')
+    if not res.success:
+        res = optimize.minimize(sse, fallback, method='Nelder-Mead')
+    return res.x, res.success
+
+def boot_fitr(y, i0, A, t0, guess_r):
+    tt = np.arange(len(y)) + i0
+    def sse(p):
+        return np.sum((y - boot_gompertz(tt, A, p[0], t0))**2)
+    res = optimize.minimize(sse, [guess_r], method='Nelder-Mead')
+    return res.x[0], res.success
+
+# Warm starts: the parameters fitted to the observed data (above); fallbacks: the original initial guesses.
+boot_warm = {'UK': [A_UK, r_UK, t0_UK], 'SE': [A_SE, r_SE, t0_SE],
+             'UKb': [A_UKbefore, r_UKbefore, t0_UKbefore], 'UKl': r_UKlockdown,
+             'SEb': [A_SEbefore, r_SEbefore, t0_SEbefore], 'SEl': r_SElockdown}
+
+def boot_pipeline(yUK, ySE, yEN):
+    """Recompute Statistics 1-3 from (possibly synthetic) daily deaths series.
+    Mirrors the main pipeline exactly; returns (s1, s2, s3) or None on a failed fit."""
+    iUK = smooth(yUK, 7)/IFR
+    iSE = smooth(ySE, 7)/IFR
+    iEN = smooth(yEN, 7)/IFR
+
+    def sir_beta(i, pop):
+        n = len(i)
+        S = 0.65*pop - np.cumsum(i)              # S[0] = 0.65N - c_0; S[t] = S[t-1] - c_t
+        I = np.convolve(i, np.ones(9))[:n]       # fixed 9-day infectious period (1/gamma)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            beta = pop*i/(I*S)                   # = -(N/(I*S))*dS/dt, with corrected t=0
+        return S, np.where(np.isfinite(beta), beta, 0.0)
+
+    S_UKb_, beta_UKb_ = sir_beta(iUK, pop_UK)
+    S_SEb_, beta_SEb_ = sir_beta(iSE, pop_SE)
+    S_ENb_, beta_ENb_ = sir_beta(iEN, pop_EN)
+
+    # Statistic 1: Gompertz growth-rate difference, with peak alignment re-estimated
+    pUK, ok1 = boot_fit3(iUK[:last_UK_epi_index+1], boot_warm['UK'], initial_guess_UK)
+    pSE, ok2 = boot_fit3(iSE[:last_SE_epi_index+1], boot_warm['SE'], initial_guess_SE)
+    if not (ok1 and ok2):
+        return None
+    maxUK = int(np.argmax(boot_gompertz(np.arange(last_UK_epi_index+1), pUK[0], pUK[1], pUK[2])))
+    maxSE = int(np.argmax(boot_gompertz(np.arange(last_SE_epi_index+1), pSE[0], pSE[1], pSE[2])))
+    off = maxSE - maxUK
+    fSE = first_day_UK_lockdown_index + off
+    lSE = last_day_UK_lockdown_index + off
+    if fSE < 5 or lSE + 1 > len(iSE):
+        return None
+    pUKb, ok3 = boot_fit3(iUK[:first_day_UK_lockdown_index], boot_warm['UKb'], initial_guess_UKbefore)
+    if not ok3:
+        return None
+    rUKl, ok4 = boot_fitr(iUK[first_day_UK_lockdown_index:last_day_UK_lockdown_index+1],
+                          first_day_UK_lockdown_index, pUKb[0], pUKb[2], boot_warm['UKl'])
+    pSEb, ok5 = boot_fit3(iSE[:fSE], boot_warm['SEb'], initial_guess_SEbefore)
+    if not (ok4 and ok5):
+        return None
+    rSEl, ok6 = boot_fitr(iSE[fSE:lSE+1], fSE, pSEb[0], pSEb[2], boot_warm['SEl'])
+    if not ok6:
+        return None
+    s1 = rUKl - rSEl
+
+    # Statistic 2: d(beta)/ds with matched Sweden control, 12-day smoothing after matching
+    def dbds(beta, S, pop):
+        s = 100.0*S/pop
+        db = np.empty(len(beta)); dsv = np.empty(len(beta))
+        db[1:] = np.diff(beta); db[0] = beta[1]-beta[0]
+        dsv[1:] = np.diff(s);   dsv[0] = s[1]-s[0]
+        out = np.zeros(len(beta))
+        nz = dsv != 0
+        out[nz] = db[nz]/dsv[nz]
+        return out, s
+
+    dbdsUK, sUK = dbds(beta_UKb_, S_UKb_, pop_UK)
+    dbdsSE, sSE = dbds(beta_SEb_, S_SEb_, pop_SE)
+    epi_sUK = sUK[:last_UK_epi_index+1]
+    epi_sSE = sSE[:last_SE_epi_index+1]
+    epi_dbdsUK = dbdsUK[:last_UK_epi_index+1]
+    closest = np.argmin((epi_sUK[:, None] - epi_sSE[None, :])**2, axis=1)
+    ctrl = dbdsSE[closest]
+    s2 = np.mean(smooth(epi_dbdsUK, 12)[25:75]) - np.mean(smooth(ctrl, 12)[25:75])
+
+    # Statistic 3: masks difference-in-differences on 12-day-smoothed beta
+    bENs = smooth(beta_ENb_, 12)
+    bSEs = smooth(beta_SEb_, 12)
+    s3 = (bENs[196]-bENs[147]) - (bSEs[196]-bSEs[147])
+
+    if not (np.isfinite(s1) and np.isfinite(s2) and np.isfinite(s3)):
+        return None
+    return s1, s2, s3
+
+def boot_resample(y, rng, block):
+    """Weekday-aligned moving-block bootstrap of Pearson-scaled residuals
+    around the 7-day moving-average trend."""
+    n = len(y)
+    trend = smooth(y, 7)
+    sd = np.sqrt(np.maximum(trend, 1.0))
+    resid = (y - trend)/sd
+    out = np.empty(n)
+    pos = 0
+    while pos < n:
+        cands = np.arange(pos % 7, n - block + 1, 7)
+        if len(cands) == 0:
+            cands = np.arange(0, max(1, n - block + 1))
+        start = rng.choice(cands)
+        ln = min(block, n - pos)
+        out[pos:pos+ln] = resid[start:start+ln]
+        pos += ln
+    return np.rint(np.maximum(0.0, trend + sd*out))
+
+# Internal consistency check: the bootstrap's pipeline mirror must reproduce the main statistics.
+boot_stat1_main = r_UKlockdown - r_SElockdown
+boot_stat2_main = statistics.mean(epi_dbetadS1_UK_smoothed[25:74+1]) - statistics.mean(control_smoothed[25:74+1])
+boot_stat3_main = (beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[196] - beta_SE_smoothed[147])
+boot_point = boot_pipeline(boot_deaths_UK, boot_deaths_SE, boot_deaths_EN)
+boot_check = max(abs(boot_point[0]-boot_stat1_main), abs(boot_point[1]-boot_stat2_main), abs(boot_point[2]-boot_stat3_main))
+
+print("Running moving-block bootstrap (B = " + str(BOOT_B) + ")...")
+boot_results = []
+boot_failures = 0
+for boot_b in range(BOOT_B):
+    boot_r = boot_pipeline(boot_resample(boot_deaths_UK, boot_rng, BOOT_BLOCK),
+                           boot_resample(boot_deaths_SE, boot_rng, BOOT_BLOCK),
+                           boot_resample(boot_deaths_EN, boot_rng, BOOT_BLOCK))
+    if boot_r is None:
+        boot_failures += 1
+    else:
+        boot_results.append(boot_r)
+    if (boot_b+1) % 1000 == 0:
+        print("  bootstrap replicate " + str(boot_b+1) + "/" + str(BOOT_B))
+boot_arr = np.array(boot_results)
+
+f.write('\n')
+f.write('\n')
+f.write('Bootstrap Uncertainty Analysis\n')
+f.write('Moving-block bootstrap: B = ' + str(BOOT_B) + ' replicates, block length ' + str(BOOT_BLOCK) + ' days (weekday-aligned), seed ' + str(BOOT_SEED) + '.\n')
+f.write('Trend: 7-day moving average of daily deaths; Pearson-scaled residuals resampled; full pipeline recomputed per replicate.\n')
+f.write('95% percentile intervals, conditional on the modelling choices (IFR, 35% pre-existing immunity, 27-day infection-to-death lag, matching designs).\n')
+f.write('Internal consistency check (pipeline mirror vs main code, max abs diff): ' + str(boot_check) + '\n')
+f.write('Replicates discarded due to failed fits: ' + str(boot_failures) + '\n')
+for boot_i, (boot_name, boot_pt) in enumerate([('Statistic 1', boot_stat1_main), ('Statistic 2', boot_stat2_main), ('Statistic 3', boot_stat3_main)]):
+    boot_lo, boot_hi = np.percentile(boot_arr[:, boot_i], [2.5, 97.5])
+    boot_se = boot_arr[:, boot_i].std(ddof=1)
+    boot_verdict = 'interval includes zero' if (boot_lo <= 0.0 <= boot_hi) else 'interval excludes zero'
+    f.write(boot_name + ': ' + str(boot_pt) + ', bootstrap SE ' + str(boot_se) + ', 95% CI [' + str(boot_lo) + ', ' + str(boot_hi) + '] (' + boot_verdict + ')\n')
 
 f.flush()
 os.fsync(f.fileno())
