@@ -963,9 +963,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-figLV.savefig("lockdownlowvax.pdf")
+figLV.savefig("lockdownstringencylow.pdf")
 axLV.set_title('Excess mortality for countries with low lockdown stringency')
-figLV.savefig("lockdownlowvax.png")
+figLV.savefig("lockdownstringencylow.png")
 
 # MED LOCKDOWN VS VAX
 lockdownmedvaxlow = genfromtxt('lockdownmedvaxlow.txt', delimiter='\t')
@@ -998,9 +998,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-figLV.savefig("lockdownmedvax.pdf")
+figLV.savefig("lockdownstringencymed.pdf")
 axLV.set_title('Excess mortality for countries with medium lockdown stringency')
-figLV.savefig("lockdownmedvax.png")
+figLV.savefig("lockdownstringencymed.png")
 
 
 # HIGH LOCKDOWN VS VAX
@@ -1034,9 +1034,9 @@ figLV.autofmt_xdate()
 axLV.grid(visible=True)
 legend = axLV.legend(fancybox=True, framealpha=0.8)
 legend.get_frame().set_alpha(1)
-figLV.savefig("lockdownhighvax.pdf")
+figLV.savefig("lockdownstringencyhigh.pdf")
 axLV.set_title('Excess mortality for countries with high lockdown stringency')
-figLV.savefig("lockdownhighvax.png")
+figLV.savefig("lockdownstringencyhigh.png")
 
 
 
