@@ -6,7 +6,7 @@
 # s = 100*S/N (the percentage of the population susceptible); documented the
 # fixed-duration SIR reconstruction; made the output statistics explicitly
 # descriptive and added unsmoothed variants; removed no-op prop_cycler lines;
-# added a moving-block bootstrap uncertainty analysis for Statistics 1-3.
+# added a moving-block bootstrap uncertainty analysis for Statistics 1-3 and the Gompertz difference-in-differences.
 
 import datetime as dt
 import matplotlib.dates as mdates
@@ -5383,6 +5383,7 @@ def boot_pipeline(yUK, ySE, yEN):
     if not ok6:
         return None
     s1 = rUKl - rSEl
+    s4 = (rUKl - pUKb[1]) - (rSEl - pSEb[1])  # Gompertz difference-in-differences
 
     # Statistic 2: d(beta)/ds with matched Sweden control, 12-day smoothing after matching
     def dbds(beta, S, pop):
@@ -5409,9 +5410,9 @@ def boot_pipeline(yUK, ySE, yEN):
     bSEs = smooth(beta_SEb_, 12)
     s3 = (bENs[196]-bENs[147]) - (bSEs[196]-bSEs[147])
 
-    if not (np.isfinite(s1) and np.isfinite(s2) and np.isfinite(s3)):
+    if not (np.isfinite(s1) and np.isfinite(s2) and np.isfinite(s3) and np.isfinite(s4)):
         return None
-    return s1, s2, s3
+    return s1, s2, s3, s4
 
 def boot_resample(y, rng, block):
     """Weekday-aligned moving-block bootstrap of Pearson-scaled residuals
@@ -5436,8 +5437,9 @@ def boot_resample(y, rng, block):
 boot_stat1_main = r_UKlockdown - r_SElockdown
 boot_stat2_main = statistics.mean(epi_dbetadS1_UK_smoothed[25:74+1]) - statistics.mean(control_smoothed[25:74+1])
 boot_stat3_main = (beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[196] - beta_SE_smoothed[147])
+boot_stat4_main = (r_UKlockdown - r_UKbefore) - (r_SElockdown - r_SEbefore)  # Gompertz difference-in-differences
 boot_point = boot_pipeline(boot_deaths_UK, boot_deaths_SE, boot_deaths_EN)
-boot_check = max(abs(boot_point[0]-boot_stat1_main), abs(boot_point[1]-boot_stat2_main), abs(boot_point[2]-boot_stat3_main))
+boot_check = max(abs(boot_point[0]-boot_stat1_main), abs(boot_point[1]-boot_stat2_main), abs(boot_point[2]-boot_stat3_main), abs(boot_point[3]-boot_stat4_main))
 
 print("Running moving-block bootstrap (B = " + str(BOOT_B) + ")...")
 boot_results = []
@@ -5462,7 +5464,7 @@ f.write('Trend: 7-day moving average of daily deaths; Pearson-scaled residuals r
 f.write('95% percentile intervals, conditional on the modelling choices (IFR, 35% pre-existing immunity, 27-day infection-to-death lag, matching designs).\n')
 f.write('Internal consistency check (pipeline mirror vs main code, max abs diff): ' + str(boot_check) + '\n')
 f.write('Replicates discarded due to failed fits: ' + str(boot_failures) + '\n')
-for boot_i, (boot_name, boot_pt) in enumerate([('Statistic 1', boot_stat1_main), ('Statistic 2', boot_stat2_main), ('Statistic 3', boot_stat3_main)]):
+for boot_i, (boot_name, boot_pt) in enumerate([('Statistic 1', boot_stat1_main), ('Statistic 2', boot_stat2_main), ('Statistic 3', boot_stat3_main), ('Statistic 1 difference-in-differences', boot_stat4_main)]):
     boot_lo, boot_hi = np.percentile(boot_arr[:, boot_i], [2.5, 97.5])
     boot_se = boot_arr[:, boot_i].std(ddof=1)
     boot_verdict = 'interval includes zero' if (boot_lo <= 0.0 <= boot_hi) else 'interval excludes zero'
