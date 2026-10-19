@@ -5409,10 +5409,13 @@ def boot_pipeline(yUK, ySE, yEN):
     bENs = smooth(beta_ENb_, 12)
     bSEs = smooth(beta_SEb_, 12)
     s3 = (bENs[196]-bENs[147]) - (bSEs[196]-bSEs[147])
+    # C10: the same mask contrast with England and Sweden aligned on common calendar
+    # dates (Swedish indices 138 and 187 fall on the English calendar dates 147 and 196).
+    s5 = (bENs[196]-bENs[147]) - (bSEs[187]-bSEs[138])
 
-    if not (np.isfinite(s1) and np.isfinite(s2) and np.isfinite(s3) and np.isfinite(s4)):
+    if not (np.isfinite(s1) and np.isfinite(s2) and np.isfinite(s3) and np.isfinite(s4) and np.isfinite(s5)):
         return None
-    return s1, s2, s3, s4
+    return s1, s2, s3, s4, s5
 
 def boot_resample(y, rng, block):
     """Weekday-aligned moving-block bootstrap of Pearson-scaled residuals
@@ -5438,8 +5441,9 @@ boot_stat1_main = r_UKlockdown - r_SElockdown
 boot_stat2_main = statistics.mean(epi_dbetadS1_UK_smoothed[25:74+1]) - statistics.mean(control_smoothed[25:74+1])
 boot_stat3_main = (beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[196] - beta_SE_smoothed[147])
 boot_stat4_main = (r_UKlockdown - r_UKbefore) - (r_SElockdown - r_SEbefore)  # Gompertz difference-in-differences
+boot_stat5_main = (beta_EN_smoothed[196] - beta_EN_smoothed[147]) - (beta_SE_smoothed[187] - beta_SE_smoothed[138])  # mask contrast, common calendar dates (C10)
 boot_point = boot_pipeline(boot_deaths_UK, boot_deaths_SE, boot_deaths_EN)
-boot_check = max(abs(boot_point[0]-boot_stat1_main), abs(boot_point[1]-boot_stat2_main), abs(boot_point[2]-boot_stat3_main), abs(boot_point[3]-boot_stat4_main))
+boot_check = max(abs(boot_point[0]-boot_stat1_main), abs(boot_point[1]-boot_stat2_main), abs(boot_point[2]-boot_stat3_main), abs(boot_point[3]-boot_stat4_main), abs(boot_point[4]-boot_stat5_main))
 
 print("Running moving-block bootstrap (B = " + str(BOOT_B) + ")...")
 boot_results = []
@@ -5464,7 +5468,7 @@ f.write('Trend: 7-day moving average of daily deaths; Pearson-scaled residuals r
 f.write('95% percentile intervals, conditional on the modelling choices (IFR, 35% pre-existing immunity, 27-day infection-to-death lag, matching designs).\n')
 f.write('Internal consistency check (pipeline mirror vs main code, max abs diff): ' + str(boot_check) + '\n')
 f.write('Replicates discarded due to failed fits: ' + str(boot_failures) + '\n')
-for boot_i, (boot_name, boot_pt) in enumerate([('Statistic 1', boot_stat1_main), ('Statistic 2', boot_stat2_main), ('Statistic 3', boot_stat3_main), ('Statistic 1 difference-in-differences', boot_stat4_main)]):
+for boot_i, (boot_name, boot_pt) in enumerate([('Statistic 1', boot_stat1_main), ('Statistic 2', boot_stat2_main), ('Statistic 3', boot_stat3_main), ('Statistic 1 difference-in-differences', boot_stat4_main), ('Statistic 3 common-calendar sensitivity', boot_stat5_main)]):
     boot_lo, boot_hi = np.percentile(boot_arr[:, boot_i], [2.5, 97.5])
     boot_se = boot_arr[:, boot_i].std(ddof=1)
     boot_verdict = 'interval includes zero' if (boot_lo <= 0.0 <= boot_hi) else 'interval excludes zero'
