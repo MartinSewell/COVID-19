@@ -1,7 +1,12 @@
-// The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-à-Vis Mitigating COVID-19
+// The Effectiveness of Lockdowns, Face Masks and Vaccination Programmes Vis-a-Vis Mitigating COVID-19
 // Martin Sewell
 // martin.sewell@cantab.net
 // 22 October 2024
+// Reviewed 21 October 2026: explicit units, calendar-year boundaries, cumulative
+// totals, validated clustering input and safer file handling. See AUDIT_REPORT.txt.
+// Updated 21 October 2026: smaller stack frames, streamed cluster/pair exports,
+// and the duplicated date-range test removed. See WINDOWS_BUILD_NOTES.txt.
+// Define OWID_SKIP_DTW only when intentionally omitting the final DTW stage.
 
 // INPUT FILES: [all downloaded on 1 August 2024]
 // Info on data: [For information only, do not need this.]
@@ -25,6 +30,8 @@
 // https://ourworldindata.org/grapher/daily-covid-vaccination-doses-per-capita
 // daily-covid-vaccination-doses-per-capita.csv
 // Entity,Code,Day,new_vaccinations_smoothed_per_million
+// The supplied historical Grapher values are actually per 100 people per day.
+// A matched comparison with owid-covid-data.csv validates the scale at runtime.
 // Afghanistan, AFG, 2021 - 02 - 23, 0.0033
 // Zimbabwe,ZWE,2022-10-09,0.006900000000000001
 
@@ -39,7 +46,7 @@
 // https://ourworldindata.org/covid-deaths [already downloaded above]
 // new_deaths_smoothed_per_million
 // owid-covid-data.csv [column 15 (where first col is 0)]
-// used for coviddeaths[] and cumcoviddeaths[]
+// Used for daily coviddeaths[]; cumcoviddeaths[] uses total_deaths_per_million (column 13).
 // iso_code,continent,location,date,total_cases,new_cases.............
 // AFG,Asia,Afghanistan,2020-01-03,,0.0,,,0.0,,,0.0,,,0.0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,0.0,54.422,18.6,2.581,1.337,1803.987,,597.029,9.59,,,37.746,0.5,64.83,0.511,41128772.0,,,,
 // ZWE,Africa,Zimbabwe,2023-08-23,265716.0,0.0,0.0,5713.0,0.0,0.0,16281.08,0.0,0.0,350.05,0.0,0.0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,42.729,19.6,2.822,1.882,1899.775,21.4,307.846,1.82,1.6,30.7,36.791,1.7,61.49,0.571,16320539.0,,,,
@@ -59,7 +66,17 @@
 #include <numeric>
 #include <string>
 #include <vector>
-#include <DTW.hpp>
+#ifndef OWID_SKIP_DTW
+#include "DTW.hpp"
+#endif
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <limits>
+#include <iomanip>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 int numdates;
 int numentities;
@@ -87,31 +104,48 @@ std::string tostring(double t) {
 long double Mean(std::vector<long double> v)
 {
 	unsigned long long n = v.size();
-	long double sum = accumulate(v.begin(), v.end(), 0.0);
+	if (v.empty()) return std::numeric_limits<long double>::quiet_NaN();
+	long double sum = std::accumulate(v.begin(), v.end(), 0.0L);
 	long double mean = sum / (long double)n;
 	return mean;
 }
 
 
-int CountryIndex(std::vector<std::string> list, std::string item)
+int CountryIndex(const std::vector<std::string>& list, const std::string& item)
 {
-	if (!item.empty()) {
-		auto it = find(list.begin(), list.end(), item);
-		if (it != list.end()) {
-			int index = it - list.begin();
-			return index;
-		}
-		else {
-			std::cout << item << " not found" << " ";
-			return -1;
-		}
-	}
-	else {
-		std::cout << "CountryIndex error";
-		return -1;
-	}
+    const auto it = std::find(list.begin(), list.end(), item);
+    if (item.empty() || it == list.end())
+        throw std::runtime_error("Country code not found: " + item);
+    return static_cast<int>(it - list.begin());
 }
 
+// Standard CSV quoting, including doubled quotes within a quoted field.
+std::vector<std::string> csv_fields(const std::string& line) {
+    std::vector<std::string> result;
+    std::string field;
+    bool quoted = false;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char ch = line[i];
+        if (ch == '"') {
+            if (quoted && i + 1 < line.size() && line[i+1] == '"') { field += '"'; ++i; }
+            else quoted = !quoted;
+        } else if (ch == ',' && !quoted) { result.push_back(field); field.clear(); }
+        else if (ch != '\r') field += ch;
+    }
+    if (quoted) throw std::runtime_error("Unclosed quote in CSV row.");
+    result.push_back(field);
+    return result;
+}
+
+// FNV-1a fingerprint prevents stale clusters from being applied to changed matrices.
+std::uint64_t file_fingerprint(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) throw std::runtime_error("Could not read " + path);
+    std::uint64_t h = 14695981039346656037ULL;
+    char ch;
+    while (in.get(ch)) { h ^= static_cast<unsigned char>(ch); h *= 1099511628211ULL; }
+    return h;
+}
 
 /**
  * Compute the p_norm between two 1D c++ vectors.
@@ -126,6 +160,8 @@ int CountryIndex(std::vector<std::string> list, std::string item)
  * @p value of norm to use.
  */
 double p_norm(std::vector<double> a, std::vector<double> b, double p) {
+	if (a.size() != b.size() || !std::isfinite(p) || p <= 0)
+        throw std::invalid_argument("p_norm requires equal-length vectors and a finite positive p.");
 	double d = 0;
 	for (int i = 0; i < a.size(); i++) {
 		d += std::pow(std::abs(a[i] - b[i]), p);
@@ -139,7 +175,7 @@ std::vector<double> Interpolate(std::vector<double> v) {
 	std::vector<double> x;
 	std::vector<double> y;
 	for (unsigned int d = 0; d < v.size(); d++) {
-		if (!isnan(v[d])) {
+		if (!std::isnan(v[d])) {
 			x.push_back(double(d));
 			y.push_back(v[d]);
 		}
@@ -148,14 +184,14 @@ std::vector<double> Interpolate(std::vector<double> v) {
 	int last = -1;
 	bool firstcase = true;
 	for (unsigned int d = 0; d < interpolated.size(); d++)
-		if (!isnan(v[d])) {
+		if (!std::isnan(v[d])) {
 			if (firstcase == true) {
 				first = d;
 				firstcase = false;
 			}
 			last = d;
 		}
-	if (x.size() > 0) {
+	if (x.size() > 1) {
 		boost::math::interpolators::barycentric_rational<double> interpolant(x.data(), y.data(), x.size(), 0);
 		for (unsigned int d = 0; d < interpolated.size(); d++) {
 			if (first <= d && d <= last) {
@@ -171,2469 +207,151 @@ std::vector<double> Interpolate(std::vector<double> v) {
 
 
 
-int doclustering(int c, std::vector<int> clustcd, std::vector<int> clustem, std::vector < std::vector<double> > vaccinations, std::vector<double> cumvax, std::vector < std::vector<double> > coviddeaths, std::vector < std::vector<double> > excessmortalitypscoreinterpolated) {
-
-
-	std::vector<int> vaxlowcd0;
-	std::vector<int> vaxmedcd0;
-	std::vector<int> vaxhighcd0;
-
-	std::vector<int> vaxlowcd1;
-	std::vector<int> vaxmedcd1;
-	std::vector<int> vaxhighcd1;
-
-	std::vector<int> vaxlowcd2;
-	std::vector<int> vaxmedcd2;
-	std::vector<int> vaxhighcd2;
-
-	std::vector<int> vaxlowcd3;
-	std::vector<int> vaxmedcd3;
-	std::vector<int> vaxhighcd3;
-
-	std::vector<int> vaxlowcd4;
-	std::vector<int> vaxmedcd4;
-	std::vector<int> vaxhighcd4;
-
-	std::vector<int> vaxlowcd5;
-	std::vector<int> vaxmedcd5;
-	std::vector<int> vaxhighcd5;
-
-	std::vector<int> vaxlowcd6;
-	std::vector<int> vaxmedcd6;
-	std::vector<int> vaxhighcd6;
-
-	std::vector<int> vaxlowcd7;
-	std::vector<int> vaxmedcd7;
-	std::vector<int> vaxhighcd7;
-
-	std::vector<int> vaxlowcd8;
-	std::vector<int> vaxmedcd8;
-	std::vector<int> vaxhighcd8;
-
-	std::vector<int> vaxlowcd9;
-	std::vector<int> vaxmedcd9;
-	std::vector<int> vaxhighcd9;
-
-	std::vector<int> vaxlowcd10;
-	std::vector<int> vaxmedcd10;
-	std::vector<int> vaxhighcd10;
-
-	std::vector<int> vaxlowcd11;
-	std::vector<int> vaxmedcd11;
-	std::vector<int> vaxhighcd11;
-
-	std::vector<int> vaxlowcd12;
-	std::vector<int> vaxmedcd12;
-	std::vector<int> vaxhighcd12;
-
-	std::vector<int> vaxlowcd13;
-	std::vector<int> vaxmedcd13;
-	std::vector<int> vaxhighcd13;
-
-	std::vector<int> vaxlowcd14;
-	std::vector<int> vaxmedcd14;
-	std::vector<int> vaxhighcd14;
-
-	std::vector<int> vaxlowcd15;
-	std::vector<int> vaxmedcd15;
-	std::vector<int> vaxhighcd15;
-
-	std::vector<int> vaxlowcd16;
-	std::vector<int> vaxmedcd16;
-	std::vector<int> vaxhighcd16;
-
-	std::vector<int> vaxlowcd17;
-	std::vector<int> vaxmedcd17;
-	std::vector<int> vaxhighcd17;
-
-	std::vector<int> vaxlowcd18;
-	std::vector<int> vaxmedcd18;
-	std::vector<int> vaxhighcd18;
-
-	std::vector<int> vaxlowcd19;
-	std::vector<int> vaxmedcd19;
-	std::vector<int> vaxhighcd19;
-
-	std::vector<int> vaxlowem0;
-	std::vector<int> vaxmedem0;
-	std::vector<int> vaxhighem0;
-
-	std::vector<int> vaxlowem1;
-	std::vector<int> vaxmedem1;
-	std::vector<int> vaxhighem1;
-
-	std::vector<int> vaxlowem2;
-	std::vector<int> vaxmedem2;
-	std::vector<int> vaxhighem2;
-
-	std::vector<int> vaxlowem3;
-	std::vector<int> vaxmedem3;
-	std::vector<int> vaxhighem3;
-
-	std::vector<int> vaxlowem4;
-	std::vector<int> vaxmedem4;
-	std::vector<int> vaxhighem4;
-
-	std::vector<int> vaxlowem5;
-	std::vector<int> vaxmedem5;
-	std::vector<int> vaxhighem5;
-
-	std::vector<int> vaxlowem6;
-	std::vector<int> vaxmedem6;
-	std::vector<int> vaxhighem6;
-
-	std::vector<int> vaxlowem7;
-	std::vector<int> vaxmedem7;
-	std::vector<int> vaxhighem7;
-
-	std::vector<int> vaxlowem8;
-	std::vector<int> vaxmedem8;
-	std::vector<int> vaxhighem8;
-
-	std::vector<int> vaxlowem9;
-	std::vector<int> vaxmedem9;
-	std::vector<int> vaxhighem9;
-
-	std::vector<int> vaxlowem10;
-	std::vector<int> vaxmedem10;
-	std::vector<int> vaxhighem10;
-
-	std::vector<int> vaxlowem11;
-	std::vector<int> vaxmedem11;
-	std::vector<int> vaxhighem11;
-
-	std::vector<int> vaxlowem12;
-	std::vector<int> vaxmedem12;
-	std::vector<int> vaxhighem12;
-
-	std::vector<int> vaxlowem13;
-	std::vector<int> vaxmedem13;
-	std::vector<int> vaxhighem13;
-
-	std::vector<int> vaxlowem14;
-	std::vector<int> vaxmedem14;
-	std::vector<int> vaxhighem14;
-
-	std::vector<int> vaxlowem15;
-	std::vector<int> vaxmedem15;
-	std::vector<int> vaxhighem15;
-
-	std::vector<int> vaxlowem16;
-	std::vector<int> vaxmedem16;
-	std::vector<int> vaxhighem16;
-
-	std::vector<int> vaxlowem17;
-	std::vector<int> vaxmedem17;
-	std::vector<int> vaxhighem17;
-
-	std::vector<int> vaxlowem18;
-	std::vector<int> vaxmedem18;
-	std::vector<int> vaxhighem18;
-
-	std::vector<int> vaxlowem19;
-	std::vector<int> vaxmedem19;
-	std::vector<int> vaxhighem19;
-
-
-	// clustcd[c] and clustem[c] only include clustering countries
-	int ci = 0;
-	for (unsigned int i = 0; i < numentities; i++) {
-		if (std::find(vaxlow.begin(), vaxlow.end(), i) != vaxlow.end()) {
-			if (clustcd[ci] == 0)
-				vaxlowcd0.push_back(i);
-			if (clustcd[ci] == 1)
-				vaxlowcd1.push_back(i);
-			if (clustcd[ci] == 2)
-				vaxlowcd2.push_back(i);
-			if (clustcd[ci] == 3)
-				vaxlowcd3.push_back(i);
-			if (clustcd[ci] == 4)
-				vaxlowcd4.push_back(i);
-			if (clustcd[ci] == 5)
-				vaxlowcd5.push_back(i);
-			if (clustcd[ci] == 6)
-				vaxlowcd6.push_back(i);
-			if (clustcd[ci] == 7)
-				vaxlowcd7.push_back(i);
-			if (clustcd[ci] == 8)
-				vaxlowcd8.push_back(i);
-			if (clustcd[ci] == 9)
-				vaxlowcd9.push_back(i);
-			if (clustcd[ci] == 10)
-				vaxlowcd10.push_back(i);
-			if (clustcd[ci] == 11)
-				vaxlowcd11.push_back(i);
-			if (clustcd[ci] == 12)
-				vaxlowcd12.push_back(i);
-			if (clustcd[ci] == 13)
-				vaxlowcd13.push_back(i);
-			if (clustcd[ci] == 14)
-				vaxlowcd14.push_back(i);
-			if (clustcd[ci] == 15)
-				vaxlowcd15.push_back(i);
-			if (clustcd[ci] == 16)
-				vaxlowcd16.push_back(i);
-			if (clustcd[ci] == 17)
-				vaxlowcd17.push_back(i);
-			if (clustcd[ci] == 18)
-				vaxlowcd18.push_back(i);
-			if (clustcd[ci] == 19)
-				vaxlowcd19.push_back(i);
-
-			if (clustem[ci] == 0)
-				vaxlowem0.push_back(i);
-			if (clustem[ci] == 1)
-				vaxlowem1.push_back(i);
-			if (clustem[ci] == 2)
-				vaxlowem2.push_back(i);
-			if (clustem[ci] == 3)
-				vaxlowem3.push_back(i);
-			if (clustem[ci] == 4)
-				vaxlowem4.push_back(i);
-			if (clustem[ci] == 5)
-				vaxlowem5.push_back(i);
-			if (clustem[ci] == 6)
-				vaxlowem6.push_back(i);
-			if (clustem[ci] == 7)
-				vaxlowem7.push_back(i);
-			if (clustem[ci] == 8)
-				vaxlowem8.push_back(i);
-			if (clustem[ci] == 9)
-				vaxlowem9.push_back(i);
-			if (clustem[ci] == 10)
-				vaxlowem10.push_back(i);
-			if (clustem[ci] == 11)
-				vaxlowem11.push_back(i);
-			if (clustem[ci] == 12)
-				vaxlowem12.push_back(i);
-			if (clustem[ci] == 13)
-				vaxlowem13.push_back(i);
-			if (clustem[ci] == 14)
-				vaxlowem14.push_back(i);
-			if (clustem[ci] == 15)
-				vaxlowem15.push_back(i);
-			if (clustem[ci] == 16)
-				vaxlowem16.push_back(i);
-			if (clustem[ci] == 17)
-				vaxlowem17.push_back(i);
-			if (clustem[ci] == 18)
-				vaxlowem18.push_back(i);
-			if (clustem[ci] == 19)
-				vaxlowem19.push_back(i);
-			ci++;
-		}
-		if (std::find(vaxmed.begin(), vaxmed.end(), i) != vaxmed.end()) {
-			if (clustcd[ci] == 0)
-				vaxmedcd0.push_back(i);
-			if (clustcd[ci] == 1)
-				vaxmedcd1.push_back(i);
-			if (clustcd[ci] == 2)
-				vaxmedcd2.push_back(i);
-			if (clustcd[ci] == 3)
-				vaxmedcd3.push_back(i);
-			if (clustcd[ci] == 4)
-				vaxmedcd4.push_back(i);
-			if (clustcd[ci] == 5)
-				vaxmedcd5.push_back(i);
-			if (clustcd[ci] == 6)
-				vaxmedcd6.push_back(i);
-			if (clustcd[ci] == 7)
-				vaxmedcd7.push_back(i);
-			if (clustcd[ci] == 8)
-				vaxmedcd8.push_back(i);
-			if (clustcd[ci] == 9)
-				vaxmedcd9.push_back(i);
-			if (clustcd[ci] == 10)
-				vaxmedcd10.push_back(i);
-			if (clustcd[ci] == 11)
-				vaxmedcd11.push_back(i);
-			if (clustcd[ci] == 12)
-				vaxmedcd12.push_back(i);
-			if (clustcd[ci] == 13)
-				vaxmedcd13.push_back(i);
-			if (clustcd[ci] == 14)
-				vaxmedcd14.push_back(i);
-			if (clustcd[ci] == 15)
-				vaxmedcd15.push_back(i);
-			if (clustcd[ci] == 16)
-				vaxmedcd16.push_back(i);
-			if (clustcd[ci] == 17)
-				vaxmedcd17.push_back(i);
-			if (clustcd[ci] == 18)
-				vaxmedcd18.push_back(i);
-			if (clustcd[ci] == 19)
-				vaxmedcd19.push_back(i);
-
-
-			if (clustem[ci] == 0)
-				vaxmedem0.push_back(i);
-			if (clustem[ci] == 1)
-				vaxmedem1.push_back(i);
-			if (clustem[ci] == 2)
-				vaxmedem2.push_back(i);
-			if (clustem[ci] == 3)
-				vaxmedem3.push_back(i);
-			if (clustem[ci] == 4)
-				vaxmedem4.push_back(i);
-			if (clustem[ci] == 5)
-				vaxmedem5.push_back(i);
-			if (clustem[ci] == 6)
-				vaxmedem6.push_back(i);
-			if (clustem[ci] == 7)
-				vaxmedem7.push_back(i);
-			if (clustem[ci] == 8)
-				vaxmedem8.push_back(i);
-			if (clustem[ci] == 9)
-				vaxmedem9.push_back(i);
-			if (clustem[ci] == 10)
-				vaxmedem10.push_back(i);
-			if (clustem[ci] == 11)
-				vaxmedem11.push_back(i);
-			if (clustem[ci] == 12)
-				vaxmedem12.push_back(i);
-			if (clustem[ci] == 13)
-				vaxmedem13.push_back(i);
-			if (clustem[ci] == 14)
-				vaxmedem14.push_back(i);
-			if (clustem[ci] == 15)
-				vaxmedem15.push_back(i);
-			if (clustem[ci] == 16)
-				vaxmedem16.push_back(i);
-			if (clustem[ci] == 17)
-				vaxmedem17.push_back(i);
-			if (clustem[ci] == 18)
-				vaxmedem18.push_back(i);
-			if (clustem[ci] == 19)
-				vaxmedem19.push_back(i);
-
-			ci++;
-		}
-
-		if (std::find(vaxhigh.begin(), vaxhigh.end(), i) != vaxhigh.end()) {
-			if (clustcd[ci] == 0)
-				vaxhighcd0.push_back(i);
-			if (clustcd[ci] == 1)
-				vaxhighcd1.push_back(i);
-			if (clustcd[ci] == 2)
-				vaxhighcd2.push_back(i);
-			if (clustcd[ci] == 3)
-				vaxhighcd3.push_back(i);
-			if (clustcd[ci] == 4)
-				vaxhighcd4.push_back(i);
-			if (clustcd[ci] == 5)
-				vaxhighcd5.push_back(i);
-			if (clustcd[ci] == 6)
-				vaxhighcd6.push_back(i);
-			if (clustcd[ci] == 7)
-				vaxhighcd7.push_back(i);
-			if (clustcd[ci] == 8)
-				vaxhighcd8.push_back(i);
-			if (clustcd[ci] == 9)
-				vaxhighcd9.push_back(i);
-			if (clustcd[ci] == 10)
-				vaxhighcd10.push_back(i);
-			if (clustcd[ci] == 11)
-				vaxhighcd11.push_back(i);
-			if (clustcd[ci] == 12)
-				vaxhighcd12.push_back(i);
-			if (clustcd[ci] == 13)
-				vaxhighcd13.push_back(i);
-			if (clustcd[ci] == 14)
-				vaxhighcd14.push_back(i);
-			if (clustcd[ci] == 15)
-				vaxhighcd15.push_back(i);
-			if (clustcd[ci] == 16)
-				vaxhighcd16.push_back(i);
-			if (clustcd[ci] == 17)
-				vaxhighcd17.push_back(i);
-			if (clustcd[ci] == 18)
-				vaxhighcd18.push_back(i);
-			if (clustcd[ci] == 19)
-				vaxhighcd19.push_back(i);
-
-
-			if (clustem[ci] == 0)
-				vaxhighem0.push_back(i);
-			if (clustem[ci] == 1)
-				vaxhighem1.push_back(i);
-			if (clustem[ci] == 2)
-				vaxhighem2.push_back(i);
-			if (clustem[ci] == 3)
-				vaxhighem3.push_back(i);
-			if (clustem[ci] == 4)
-				vaxhighem4.push_back(i);
-			if (clustem[ci] == 5)
-				vaxhighem5.push_back(i);
-			if (clustem[ci] == 6)
-				vaxhighem6.push_back(i);
-			if (clustem[ci] == 7)
-				vaxhighem7.push_back(i);
-			if (clustem[ci] == 8)
-				vaxhighem8.push_back(i);
-			if (clustem[ci] == 9)
-				vaxhighem9.push_back(i);
-			if (clustem[ci] == 10)
-				vaxhighem10.push_back(i);
-			if (clustem[ci] == 11)
-				vaxhighem11.push_back(i);
-			if (clustem[ci] == 12)
-				vaxhighem12.push_back(i);
-			if (clustem[ci] == 13)
-				vaxhighem13.push_back(i);
-			if (clustem[ci] == 14)
-				vaxhighem14.push_back(i);
-			if (clustem[ci] == 15)
-				vaxhighem15.push_back(i);
-			if (clustem[ci] == 16)
-				vaxhighem16.push_back(i);
-			if (clustem[ci] == 17)
-				vaxhighem17.push_back(i);
-			if (clustem[ci] == 18)
-				vaxhighem18.push_back(i);
-			if (clustem[ci] == 19)
-				vaxhighem19.push_back(i);
-			ci++;
-		}
-		
-	}
-
-
-	std::string s = std::to_string(c);
-
-
-	std::string clustcd0_vaxlow_filename;
-	clustcd0_vaxlow_filename = s + "_clustcd0_vaxlow.txt";
-	std::ofstream clustcd0_vaxlow_file;
-	clustcd0_vaxlow_file.open(clustcd0_vaxlow_filename);
-
-	std::string clustcd0_vaxlow_vx_filename;
-	clustcd0_vaxlow_vx_filename = s + "_clustcd0_vaxlow_vx.txt";
-	std::ofstream clustcd0_vaxlow_vx_file;
-	clustcd0_vaxlow_vx_file.open(clustcd0_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd0.size(); i++) {
-			clustcd0_vaxlow_vx_file << vaccinations[vaxlowcd0[i]][d] << "\t";
-			clustcd0_vaxlow_file << coviddeaths[vaxlowcd0[i]][d] << "\t";
-		}
-		clustcd0_vaxlow_vx_file << std::endl;
-		clustcd0_vaxlow_file << std::endl;
-	}
-
-	std::string clustcd0_vaxmed_filename;
-	clustcd0_vaxmed_filename = s + "_clustcd0_vaxmed.txt";
-	std::ofstream clustcd0_vaxmed_file;
-	clustcd0_vaxmed_file.open(clustcd0_vaxmed_filename);
-
-	std::string clustcd0_vaxmed_vx_filename;
-	clustcd0_vaxmed_vx_filename = s + "_clustcd0_vaxmed_vx.txt";
-	std::ofstream clustcd0_vaxmed_vx_file;
-	clustcd0_vaxmed_vx_file.open(clustcd0_vaxmed_vx_filename);
-
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd0.size(); i++) {
-			clustcd0_vaxmed_vx_file << vaccinations[vaxmedcd0[i]][d] << "\t";
-			clustcd0_vaxmed_file << coviddeaths[vaxmedcd0[i]][d] << "\t";
-		}
-		clustcd0_vaxmed_vx_file << std::endl;
-		clustcd0_vaxmed_file << std::endl;
-	}
-
-	std::string clustcd0_vaxhigh_filename;
-	clustcd0_vaxhigh_filename = s + "_clustcd0_vaxhigh.txt";
-	std::ofstream clustcd0_vaxhigh_file;
-	clustcd0_vaxhigh_file.open(clustcd0_vaxhigh_filename);
-
-	std::string clustcd0_vaxhigh_vx_filename;
-	clustcd0_vaxhigh_vx_filename = s + "_clustcd0_vaxhigh_vx.txt";
-	std::ofstream clustcd0_vaxhigh_vx_file;
-	clustcd0_vaxhigh_vx_file.open(clustcd0_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd0.size(); i++) {
-			clustcd0_vaxhigh_vx_file << vaccinations[vaxhighcd0[i]][d] << "\t";
-			clustcd0_vaxhigh_file << coviddeaths[vaxhighcd0[i]][d] << "\t";
-		}
-		clustcd0_vaxhigh_vx_file << std::endl;
-		clustcd0_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd1_vaxlow_filename;
-	clustcd1_vaxlow_filename = s + "_clustcd1_vaxlow.txt";
-	std::ofstream clustcd1_vaxlow_file;
-	clustcd1_vaxlow_file.open(clustcd1_vaxlow_filename);
-
-	std::string clustcd1_vaxlow_vx_filename;
-	clustcd1_vaxlow_vx_filename = s + "_clustcd1_vaxlow_vx.txt";
-	std::ofstream clustcd1_vaxlow_vx_file;
-	clustcd1_vaxlow_vx_file.open(clustcd1_vaxlow_vx_filename);
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd1.size(); i++) {
-			clustcd1_vaxlow_vx_file << vaccinations[vaxlowcd1[i]][d] << "\t";
-			clustcd1_vaxlow_file << coviddeaths[vaxlowcd1[i]][d] << "\t";
-		}
-		clustcd1_vaxlow_file << std::endl;
-		clustcd1_vaxlow_vx_file << std::endl;
-	}
-
-	std::string clustcd1_vaxmed_filename;
-	clustcd1_vaxmed_filename = s + "_clustcd1_vaxmed.txt";
-	std::ofstream clustcd1_vaxmed_file;
-	clustcd1_vaxmed_file.open(clustcd1_vaxmed_filename);
-
-	std::string clustcd1_vaxmed_vx_filename;
-	clustcd1_vaxmed_vx_filename = s + "_clustcd1_vaxmed_vx.txt";
-	std::ofstream clustcd1_vaxmed_vx_file;
-	clustcd1_vaxmed_vx_file.open(clustcd1_vaxmed_vx_filename);
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd1.size(); i++) {
-			clustcd1_vaxmed_vx_file << vaccinations[vaxmedcd1[i]][d] << "\t";
-			clustcd1_vaxmed_file << coviddeaths[vaxmedcd1[i]][d] << "\t";
-		}
-		clustcd1_vaxmed_vx_file << std::endl;
-		clustcd1_vaxmed_file << std::endl;
-	}
-
-	std::string clustcd1_vaxhigh_filename;
-	clustcd1_vaxhigh_filename = s + "_clustcd1_vaxhigh.txt";
-	std::ofstream clustcd1_vaxhigh_file;
-	clustcd1_vaxhigh_file.open(clustcd1_vaxhigh_filename);
-
-	std::string clustcd1_vaxhigh_vx_filename;
-	clustcd1_vaxhigh_vx_filename = s + "_clustcd1_vaxhigh_vx.txt";
-	std::ofstream clustcd1_vaxhigh_vx_file;
-	clustcd1_vaxhigh_vx_file.open(clustcd1_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd1.size(); i++) {
-			clustcd1_vaxhigh_vx_file << vaccinations[vaxhighcd1[i]][d] << "\t";
-			clustcd1_vaxhigh_file << coviddeaths[vaxhighcd1[i]][d] << "\t";
-		}
-		clustcd1_vaxhigh_vx_file << std::endl;
-		clustcd1_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd2_vaxlow_filename;
-	clustcd2_vaxlow_filename = s + "_clustcd2_vaxlow.txt";
-	std::ofstream clustcd2_vaxlow_file;
-	clustcd2_vaxlow_file.open(clustcd2_vaxlow_filename);
-	std::string clustcd2_vaxlow_vx_filename;
-	clustcd2_vaxlow_vx_filename = s + "_clustcd2_vaxlow_vx.txt";
-	std::ofstream clustcd2_vaxlow_vx_file;
-	clustcd2_vaxlow_vx_file.open(clustcd2_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd2.size(); i++) {
-			clustcd2_vaxlow_vx_file << vaccinations[vaxlowcd2[i]][d] << "\t";
-			clustcd2_vaxlow_file << coviddeaths[vaxlowcd2[i]][d] << "\t";
-		}
-		clustcd2_vaxlow_vx_file << std::endl;
-		clustcd2_vaxlow_file << std::endl;
-	}
-	std::string clustcd2_vaxmed_filename;
-	clustcd2_vaxmed_filename = s + "_clustcd2_vaxmed.txt";
-	std::ofstream clustcd2_vaxmed_file;
-	clustcd2_vaxmed_file.open(clustcd2_vaxmed_filename);
-	std::string clustcd2_vaxmed_vx_filename;
-	clustcd2_vaxmed_vx_filename = s + "_clustcd2_vaxmed_vx.txt";
-	std::ofstream clustcd2_vaxmed_vx_file;
-	clustcd2_vaxmed_vx_file.open(clustcd2_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd2.size(); i++) {
-			clustcd2_vaxmed_vx_file << vaccinations[vaxmedcd2[i]][d] << "\t";
-			clustcd2_vaxmed_file << coviddeaths[vaxmedcd2[i]][d] << "\t";
-		}
-		clustcd2_vaxmed_vx_file << std::endl;
-		clustcd2_vaxmed_file << std::endl;
-	}
-	std::string clustcd2_vaxhigh_filename;
-	clustcd2_vaxhigh_filename = s + "_clustcd2_vaxhigh.txt";
-	std::ofstream clustcd2_vaxhigh_file;
-	clustcd2_vaxhigh_file.open(clustcd2_vaxhigh_filename);
-	std::string clustcd2_vaxhigh_vx_filename;
-	clustcd2_vaxhigh_vx_filename = s + "_clustcd2_vaxhigh_vx.txt";
-	std::ofstream clustcd2_vaxhigh_vx_file;
-	clustcd2_vaxhigh_vx_file.open(clustcd2_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd2.size(); i++) {
-			clustcd2_vaxhigh_vx_file << vaccinations[vaxhighcd2[i]][d] << "\t";
-			clustcd2_vaxhigh_file << coviddeaths[vaxhighcd2[i]][d] << "\t";
-		}
-		clustcd2_vaxhigh_vx_file << std::endl;
-		clustcd2_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd3_vaxlow_filename;
-	clustcd3_vaxlow_filename = s + "_clustcd3_vaxlow.txt";
-	std::ofstream clustcd3_vaxlow_file;
-	clustcd3_vaxlow_file.open(clustcd3_vaxlow_filename);
-	std::string clustcd3_vaxlow_vx_filename;
-	clustcd3_vaxlow_vx_filename = s + "_clustcd3_vaxlow_vx.txt";
-	std::ofstream clustcd3_vaxlow_vx_file;
-	clustcd3_vaxlow_vx_file.open(clustcd3_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd3.size(); i++) {
-			clustcd3_vaxlow_vx_file << vaccinations[vaxlowcd3[i]][d] << "\t";
-			clustcd3_vaxlow_file << coviddeaths[vaxlowcd3[i]][d] << "\t";
-		}
-		clustcd3_vaxlow_vx_file << std::endl;
-		clustcd3_vaxlow_file << std::endl;
-	}
-	std::string clustcd3_vaxmed_filename;
-	clustcd3_vaxmed_filename = s + "_clustcd3_vaxmed.txt";
-	std::ofstream clustcd3_vaxmed_file;
-	clustcd3_vaxmed_file.open(clustcd3_vaxmed_filename);
-	std::string clustcd3_vaxmed_vx_filename;
-	clustcd3_vaxmed_vx_filename = s + "_clustcd3_vaxmed_vx.txt";
-	std::ofstream clustcd3_vaxmed_vx_file;
-	clustcd3_vaxmed_vx_file.open(clustcd3_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd3.size(); i++) {
-			clustcd3_vaxmed_vx_file << vaccinations[vaxmedcd3[i]][d] << "\t";
-			clustcd3_vaxmed_file << coviddeaths[vaxmedcd3[i]][d] << "\t";
-		}
-		clustcd3_vaxmed_vx_file << std::endl;
-		clustcd3_vaxmed_file << std::endl;
-	}
-	std::string clustcd3_vaxhigh_filename;
-	clustcd3_vaxhigh_filename = s + "_clustcd3_vaxhigh.txt";
-	std::ofstream clustcd3_vaxhigh_file;
-	clustcd3_vaxhigh_file.open(clustcd3_vaxhigh_filename);
-	std::string clustcd3_vaxhigh_vx_filename;
-	clustcd3_vaxhigh_vx_filename = s + "_clustcd3_vaxhigh_vx.txt";
-	std::ofstream clustcd3_vaxhigh_vx_file;
-	clustcd3_vaxhigh_vx_file.open(clustcd3_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd3.size(); i++) {
-			clustcd3_vaxhigh_vx_file << vaccinations[vaxhighcd3[i]][d] << "\t";
-			clustcd3_vaxhigh_file << coviddeaths[vaxhighcd3[i]][d] << "\t";
-		}
-		clustcd3_vaxhigh_vx_file << std::endl;
-		clustcd3_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd4_vaxlow_filename;
-	clustcd4_vaxlow_filename = s + "_clustcd4_vaxlow.txt";
-	std::ofstream clustcd4_vaxlow_file;
-	clustcd4_vaxlow_file.open(clustcd4_vaxlow_filename);
-	std::string clustcd4_vaxlow_vx_filename;
-	clustcd4_vaxlow_vx_filename = s + "_clustcd4_vaxlow_vx.txt";
-	std::ofstream clustcd4_vaxlow_vx_file;
-	clustcd4_vaxlow_vx_file.open(clustcd4_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd4.size(); i++) {
-			clustcd4_vaxlow_vx_file << vaccinations[vaxlowcd4[i]][d] << "\t";
-			clustcd4_vaxlow_file << coviddeaths[vaxlowcd4[i]][d] << "\t";
-		}
-		clustcd4_vaxlow_vx_file << std::endl;
-		clustcd4_vaxlow_file << std::endl;
-	}
-	std::string clustcd4_vaxmed_filename;
-	clustcd4_vaxmed_filename = s + "_clustcd4_vaxmed.txt";
-	std::ofstream clustcd4_vaxmed_file;
-	clustcd4_vaxmed_file.open(clustcd4_vaxmed_filename);
-	std::string clustcd4_vaxmed_vx_filename;
-	clustcd4_vaxmed_vx_filename = s + "_clustcd4_vaxmed_vx.txt";
-	std::ofstream clustcd4_vaxmed_vx_file;
-	clustcd4_vaxmed_vx_file.open(clustcd4_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd4.size(); i++) {
-			clustcd4_vaxmed_vx_file << vaccinations[vaxmedcd4[i]][d] << "\t";
-			clustcd4_vaxmed_file << coviddeaths[vaxmedcd4[i]][d] << "\t";
-		}
-		clustcd4_vaxmed_vx_file << std::endl;
-		clustcd4_vaxmed_file << std::endl;
-	}
-	std::string clustcd4_vaxhigh_filename;
-	clustcd4_vaxhigh_filename = s + "_clustcd4_vaxhigh.txt";
-	std::ofstream clustcd4_vaxhigh_file;
-	clustcd4_vaxhigh_file.open(clustcd4_vaxhigh_filename);
-	std::string clustcd4_vaxhigh_vx_filename;
-	clustcd4_vaxhigh_vx_filename = s + "_clustcd4_vaxhigh_vx.txt";
-	std::ofstream clustcd4_vaxhigh_vx_file;
-	clustcd4_vaxhigh_vx_file.open(clustcd4_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd4.size(); i++) {
-			clustcd4_vaxhigh_vx_file << vaccinations[vaxhighcd4[i]][d] << "\t";
-			clustcd4_vaxhigh_file << coviddeaths[vaxhighcd4[i]][d] << "\t";
-		}
-		clustcd4_vaxhigh_vx_file << std::endl;
-		clustcd4_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd5_vaxlow_filename;
-	clustcd5_vaxlow_filename = s + "_clustcd5_vaxlow.txt";
-	std::ofstream clustcd5_vaxlow_file;
-	clustcd5_vaxlow_file.open(clustcd5_vaxlow_filename);
-	std::string clustcd5_vaxlow_vx_filename;
-	clustcd5_vaxlow_vx_filename = s + "_clustcd5_vaxlow_vx.txt";
-	std::ofstream clustcd5_vaxlow_vx_file;
-	clustcd5_vaxlow_vx_file.open(clustcd5_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd5.size(); i++) {
-			clustcd5_vaxlow_vx_file << vaccinations[vaxlowcd5[i]][d] << "\t";
-			clustcd5_vaxlow_file << coviddeaths[vaxlowcd5[i]][d] << "\t";
-		}
-		clustcd5_vaxlow_vx_file << std::endl;
-		clustcd5_vaxlow_file << std::endl;
-	}
-	std::string clustcd5_vaxmed_filename;
-	clustcd5_vaxmed_filename = s + "_clustcd5_vaxmed.txt";
-	std::ofstream clustcd5_vaxmed_file;
-	clustcd5_vaxmed_file.open(clustcd5_vaxmed_filename);
-	std::string clustcd5_vaxmed_vx_filename;
-	clustcd5_vaxmed_vx_filename = s + "_clustcd5_vaxmed_vx.txt";
-	std::ofstream clustcd5_vaxmed_vx_file;
-	clustcd5_vaxmed_vx_file.open(clustcd5_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd5.size(); i++) {
-			clustcd5_vaxmed_vx_file << vaccinations[vaxmedcd5[i]][d] << "\t";
-			clustcd5_vaxmed_file << coviddeaths[vaxmedcd5[i]][d] << "\t";
-		}
-		clustcd5_vaxmed_vx_file << std::endl;
-		clustcd5_vaxmed_file << std::endl;
-	}
-	std::string clustcd5_vaxhigh_filename;
-	clustcd5_vaxhigh_filename = s + "_clustcd5_vaxhigh.txt";
-	std::ofstream clustcd5_vaxhigh_file;
-	clustcd5_vaxhigh_file.open(clustcd5_vaxhigh_filename);
-	std::string clustcd5_vaxhigh_vx_filename;
-	clustcd5_vaxhigh_vx_filename = s + "_clustcd5_vaxhigh_vx.txt";
-	std::ofstream clustcd5_vaxhigh_vx_file;
-	clustcd5_vaxhigh_vx_file.open(clustcd5_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd5.size(); i++) {
-			clustcd5_vaxhigh_vx_file << vaccinations[vaxhighcd5[i]][d] << "\t";
-			clustcd5_vaxhigh_file << coviddeaths[vaxhighcd5[i]][d] << "\t";
-		}
-		clustcd5_vaxhigh_vx_file << std::endl;
-		clustcd5_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd6_vaxlow_filename;
-	clustcd6_vaxlow_filename = s + "_clustcd6_vaxlow.txt";
-	std::ofstream clustcd6_vaxlow_file;
-	clustcd6_vaxlow_file.open(clustcd6_vaxlow_filename);
-	std::string clustcd6_vaxlow_vx_filename;
-	clustcd6_vaxlow_vx_filename = s + "_clustcd6_vaxlow_vx.txt";
-	std::ofstream clustcd6_vaxlow_vx_file;
-	clustcd6_vaxlow_vx_file.open(clustcd6_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd6.size(); i++) {
-			clustcd6_vaxlow_vx_file << vaccinations[vaxlowcd6[i]][d] << "\t";
-			clustcd6_vaxlow_file << coviddeaths[vaxlowcd6[i]][d] << "\t";
-		}
-		clustcd6_vaxlow_vx_file << std::endl;
-		clustcd6_vaxlow_file << std::endl;
-	}
-	std::string clustcd6_vaxmed_filename;
-	clustcd6_vaxmed_filename = s + "_clustcd6_vaxmed.txt";
-	std::ofstream clustcd6_vaxmed_file;
-	clustcd6_vaxmed_file.open(clustcd6_vaxmed_filename);
-	std::string clustcd6_vaxmed_vx_filename;
-	clustcd6_vaxmed_vx_filename = s + "_clustcd6_vaxmed_vx.txt";
-	std::ofstream clustcd6_vaxmed_vx_file;
-	clustcd6_vaxmed_vx_file.open(clustcd6_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd6.size(); i++) {
-			clustcd6_vaxmed_vx_file << vaccinations[vaxmedcd6[i]][d] << "\t";
-			clustcd6_vaxmed_file << coviddeaths[vaxmedcd6[i]][d] << "\t";
-		}
-		clustcd6_vaxmed_vx_file << std::endl;
-		clustcd6_vaxmed_file << std::endl;
-	}
-	std::string clustcd6_vaxhigh_filename;
-	clustcd6_vaxhigh_filename = s + "_clustcd6_vaxhigh.txt";
-	std::ofstream clustcd6_vaxhigh_file;
-	clustcd6_vaxhigh_file.open(clustcd6_vaxhigh_filename);
-	std::string clustcd6_vaxhigh_vx_filename;
-	clustcd6_vaxhigh_vx_filename = s + "_clustcd6_vaxhigh_vx.txt";
-	std::ofstream clustcd6_vaxhigh_vx_file;
-	clustcd6_vaxhigh_vx_file.open(clustcd6_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd6.size(); i++) {
-			clustcd6_vaxhigh_vx_file << vaccinations[vaxhighcd6[i]][d] << "\t";
-			clustcd6_vaxhigh_file << coviddeaths[vaxhighcd6[i]][d] << "\t";
-		}
-		clustcd6_vaxhigh_vx_file << std::endl;
-		clustcd6_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd7_vaxlow_filename;
-	clustcd7_vaxlow_filename = s + "_clustcd7_vaxlow.txt";
-	std::ofstream clustcd7_vaxlow_file;
-	clustcd7_vaxlow_file.open(clustcd7_vaxlow_filename);
-	std::string clustcd7_vaxlow_vx_filename;
-	clustcd7_vaxlow_vx_filename = s + "_clustcd7_vaxlow_vx.txt";
-	std::ofstream clustcd7_vaxlow_vx_file;
-	clustcd7_vaxlow_vx_file.open(clustcd7_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd7.size(); i++) {
-			clustcd7_vaxlow_vx_file << vaccinations[vaxlowcd7[i]][d] << "\t";
-			clustcd7_vaxlow_file << coviddeaths[vaxlowcd7[i]][d] << "\t";
-		}
-		clustcd7_vaxlow_vx_file << std::endl;
-		clustcd7_vaxlow_file << std::endl;
-	}
-	std::string clustcd7_vaxmed_filename;
-	clustcd7_vaxmed_filename = s + "_clustcd7_vaxmed.txt";
-	std::ofstream clustcd7_vaxmed_file;
-	clustcd7_vaxmed_file.open(clustcd7_vaxmed_filename);
-	std::string clustcd7_vaxmed_vx_filename;
-	clustcd7_vaxmed_vx_filename = s + "_clustcd7_vaxmed_vx.txt";
-	std::ofstream clustcd7_vaxmed_vx_file;
-	clustcd7_vaxmed_vx_file.open(clustcd7_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd7.size(); i++) {
-			clustcd7_vaxmed_vx_file << vaccinations[vaxmedcd7[i]][d] << "\t";
-			clustcd7_vaxmed_file << coviddeaths[vaxmedcd7[i]][d] << "\t";
-		}
-		clustcd7_vaxmed_vx_file << std::endl;
-		clustcd7_vaxmed_file << std::endl;
-	}
-	std::string clustcd7_vaxhigh_filename;
-	clustcd7_vaxhigh_filename = s + "_clustcd7_vaxhigh.txt";
-	std::ofstream clustcd7_vaxhigh_file;
-	clustcd7_vaxhigh_file.open(clustcd7_vaxhigh_filename);
-	std::string clustcd7_vaxhigh_vx_filename;
-	clustcd7_vaxhigh_vx_filename = s + "_clustcd7_vaxhigh_vx.txt";
-	std::ofstream clustcd7_vaxhigh_vx_file;
-	clustcd7_vaxhigh_vx_file.open(clustcd7_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd7.size(); i++) {
-			clustcd7_vaxhigh_vx_file << vaccinations[vaxhighcd7[i]][d] << "\t";
-			clustcd7_vaxhigh_file << coviddeaths[vaxhighcd7[i]][d] << "\t";
-		}
-		clustcd7_vaxhigh_vx_file << std::endl;
-		clustcd7_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd8_vaxlow_filename;
-	clustcd8_vaxlow_filename = s + "_clustcd8_vaxlow.txt";
-	std::ofstream clustcd8_vaxlow_file;
-	clustcd8_vaxlow_file.open(clustcd8_vaxlow_filename);
-	std::string clustcd8_vaxlow_vx_filename;
-	clustcd8_vaxlow_vx_filename = s + "_clustcd8_vaxlow_vx.txt";
-	std::ofstream clustcd8_vaxlow_vx_file;
-	clustcd8_vaxlow_vx_file.open(clustcd8_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd8.size(); i++) {
-			clustcd8_vaxlow_vx_file << vaccinations[vaxlowcd8[i]][d] << "\t";
-			clustcd8_vaxlow_file << coviddeaths[vaxlowcd8[i]][d] << "\t";
-		}
-		clustcd8_vaxlow_vx_file << std::endl;
-		clustcd8_vaxlow_file << std::endl;
-	}
-	std::string clustcd8_vaxmed_filename;
-	clustcd8_vaxmed_filename = s + "_clustcd8_vaxmed.txt";
-	std::ofstream clustcd8_vaxmed_file;
-	clustcd8_vaxmed_file.open(clustcd8_vaxmed_filename);
-	std::string clustcd8_vaxmed_vx_filename;
-	clustcd8_vaxmed_vx_filename = s + "_clustcd8_vaxmed_vx.txt";
-	std::ofstream clustcd8_vaxmed_vx_file;
-	clustcd8_vaxmed_vx_file.open(clustcd8_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd8.size(); i++) {
-			clustcd8_vaxmed_vx_file << vaccinations[vaxmedcd8[i]][d] << "\t";
-			clustcd8_vaxmed_file << coviddeaths[vaxmedcd8[i]][d] << "\t";
-		}
-		clustcd8_vaxmed_vx_file << std::endl;
-		clustcd8_vaxmed_file << std::endl;
-	}
-	std::string clustcd8_vaxhigh_filename;
-	clustcd8_vaxhigh_filename = s + "_clustcd8_vaxhigh.txt";
-	std::ofstream clustcd8_vaxhigh_file;
-	clustcd8_vaxhigh_file.open(clustcd8_vaxhigh_filename);
-	std::string clustcd8_vaxhigh_vx_filename;
-	clustcd8_vaxhigh_vx_filename = s + "_clustcd8_vaxhigh_vx.txt";
-	std::ofstream clustcd8_vaxhigh_vx_file;
-	clustcd8_vaxhigh_vx_file.open(clustcd8_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd8.size(); i++) {
-			clustcd8_vaxhigh_vx_file << vaccinations[vaxhighcd8[i]][d] << "\t";
-			clustcd8_vaxhigh_file << coviddeaths[vaxhighcd8[i]][d] << "\t";
-		}
-		clustcd8_vaxhigh_vx_file << std::endl;
-		clustcd8_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd9_vaxlow_filename;
-	clustcd9_vaxlow_filename = s + "_clustcd9_vaxlow.txt";
-	std::ofstream clustcd9_vaxlow_file;
-	clustcd9_vaxlow_file.open(clustcd9_vaxlow_filename);
-	std::string clustcd9_vaxlow_vx_filename;
-	clustcd9_vaxlow_vx_filename = s + "_clustcd9_vaxlow_vx.txt";
-	std::ofstream clustcd9_vaxlow_vx_file;
-	clustcd9_vaxlow_vx_file.open(clustcd9_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd9.size(); i++) {
-			clustcd9_vaxlow_vx_file << vaccinations[vaxlowcd9[i]][d] << "\t";
-			clustcd9_vaxlow_file << coviddeaths[vaxlowcd9[i]][d] << "\t";
-		}
-		clustcd9_vaxlow_vx_file << std::endl;
-		clustcd9_vaxlow_file << std::endl;
-	}
-	std::string clustcd9_vaxmed_filename;
-	clustcd9_vaxmed_filename = s + "_clustcd9_vaxmed.txt";
-	std::ofstream clustcd9_vaxmed_file;
-	clustcd9_vaxmed_file.open(clustcd9_vaxmed_filename);
-	std::string clustcd9_vaxmed_vx_filename;
-	clustcd9_vaxmed_vx_filename = s + "_clustcd9_vaxmed_vx.txt";
-	std::ofstream clustcd9_vaxmed_vx_file;
-	clustcd9_vaxmed_vx_file.open(clustcd9_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd9.size(); i++) {
-			clustcd9_vaxmed_vx_file << vaccinations[vaxmedcd9[i]][d] << "\t";
-			clustcd9_vaxmed_file << coviddeaths[vaxmedcd9[i]][d] << "\t";
-		}
-		clustcd9_vaxmed_vx_file << std::endl;
-		clustcd9_vaxmed_file << std::endl;
-	}
-	std::string clustcd9_vaxhigh_filename;
-	clustcd9_vaxhigh_filename = s + "_clustcd9_vaxhigh.txt";
-	std::ofstream clustcd9_vaxhigh_file;
-	clustcd9_vaxhigh_file.open(clustcd9_vaxhigh_filename);
-	std::string clustcd9_vaxhigh_vx_filename;
-	clustcd9_vaxhigh_vx_filename = s + "_clustcd9_vaxhigh_vx.txt";
-	std::ofstream clustcd9_vaxhigh_vx_file;
-	clustcd9_vaxhigh_vx_file.open(clustcd9_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd9.size(); i++) {
-			clustcd9_vaxhigh_vx_file << vaccinations[vaxhighcd9[i]][d] << "\t";
-			clustcd9_vaxhigh_file << coviddeaths[vaxhighcd9[i]][d] << "\t";
-		}
-		clustcd9_vaxhigh_vx_file << std::endl;
-		clustcd9_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd10_vaxlow_filename;
-	clustcd10_vaxlow_filename = s + "_clustcd10_vaxlow.txt";
-	std::ofstream clustcd10_vaxlow_file;
-	clustcd10_vaxlow_file.open(clustcd10_vaxlow_filename);
-	std::string clustcd10_vaxlow_vx_filename;
-	clustcd10_vaxlow_vx_filename = s + "_clustcd10_vaxlow_vx.txt";
-	std::ofstream clustcd10_vaxlow_vx_file;
-	clustcd10_vaxlow_vx_file.open(clustcd10_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd10.size(); i++) {
-			clustcd10_vaxlow_vx_file << vaccinations[vaxlowcd10[i]][d] << "\t";
-			clustcd10_vaxlow_file << coviddeaths[vaxlowcd10[i]][d] << "\t";
-		}
-		clustcd10_vaxlow_vx_file << std::endl;
-		clustcd10_vaxlow_file << std::endl;
-	}
-	std::string clustcd10_vaxmed_filename;
-	clustcd10_vaxmed_filename = s + "_clustcd10_vaxmed.txt";
-	std::ofstream clustcd10_vaxmed_file;
-	clustcd10_vaxmed_file.open(clustcd10_vaxmed_filename);
-	std::string clustcd10_vaxmed_vx_filename;
-	clustcd10_vaxmed_vx_filename = s + "_clustcd10_vaxmed_vx.txt";
-	std::ofstream clustcd10_vaxmed_vx_file;
-	clustcd10_vaxmed_vx_file.open(clustcd10_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd10.size(); i++) {
-			clustcd10_vaxmed_vx_file << vaccinations[vaxmedcd10[i]][d] << "\t";
-			clustcd10_vaxmed_file << coviddeaths[vaxmedcd10[i]][d] << "\t";
-		}
-		clustcd10_vaxmed_vx_file << std::endl;
-		clustcd10_vaxmed_file << std::endl;
-	}
-	std::string clustcd10_vaxhigh_filename;
-	clustcd10_vaxhigh_filename = s + "_clustcd10_vaxhigh.txt";
-	std::ofstream clustcd10_vaxhigh_file;
-	clustcd10_vaxhigh_file.open(clustcd10_vaxhigh_filename);
-	std::string clustcd10_vaxhigh_vx_filename;
-	clustcd10_vaxhigh_vx_filename = s + "_clustcd10_vaxhigh_vx.txt";
-	std::ofstream clustcd10_vaxhigh_vx_file;
-	clustcd10_vaxhigh_vx_file.open(clustcd10_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd10.size(); i++) {
-			clustcd10_vaxhigh_vx_file << vaccinations[vaxhighcd10[i]][d] << "\t";
-			clustcd10_vaxhigh_file << coviddeaths[vaxhighcd10[i]][d] << "\t";
-		}
-		clustcd10_vaxhigh_vx_file << std::endl;
-		clustcd10_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd11_vaxlow_filename;
-	clustcd11_vaxlow_filename = s + "_clustcd11_vaxlow.txt";
-	std::ofstream clustcd11_vaxlow_file;
-	clustcd11_vaxlow_file.open(clustcd11_vaxlow_filename);
-	std::string clustcd11_vaxlow_vx_filename;
-	clustcd11_vaxlow_vx_filename = s + "_clustcd11_vaxlow_vx.txt";
-	std::ofstream clustcd11_vaxlow_vx_file;
-	clustcd11_vaxlow_vx_file.open(clustcd11_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd11.size(); i++) {
-			clustcd11_vaxlow_vx_file << vaccinations[vaxlowcd11[i]][d] << "\t";
-			clustcd11_vaxlow_file << coviddeaths[vaxlowcd11[i]][d] << "\t";
-		}
-		clustcd11_vaxlow_vx_file << std::endl;
-		clustcd11_vaxlow_file << std::endl;
-	}
-	std::string clustcd11_vaxmed_filename;
-	clustcd11_vaxmed_filename = s + "_clustcd11_vaxmed.txt";
-	std::ofstream clustcd11_vaxmed_file;
-	clustcd11_vaxmed_file.open(clustcd11_vaxmed_filename);
-	std::string clustcd11_vaxmed_vx_filename;
-	clustcd11_vaxmed_vx_filename = s + "_clustcd11_vaxmed_vx.txt";
-	std::ofstream clustcd11_vaxmed_vx_file;
-	clustcd11_vaxmed_vx_file.open(clustcd11_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd11.size(); i++) {
-			clustcd11_vaxmed_vx_file << vaccinations[vaxmedcd11[i]][d] << "\t";
-			clustcd11_vaxmed_file << coviddeaths[vaxmedcd11[i]][d] << "\t";
-		}
-		clustcd11_vaxmed_vx_file << std::endl;
-		clustcd11_vaxmed_file << std::endl;
-	}
-	std::string clustcd11_vaxhigh_filename;
-	clustcd11_vaxhigh_filename = s + "_clustcd11_vaxhigh.txt";
-	std::ofstream clustcd11_vaxhigh_file;
-	clustcd11_vaxhigh_file.open(clustcd11_vaxhigh_filename);
-	std::string clustcd11_vaxhigh_vx_filename;
-	clustcd11_vaxhigh_vx_filename = s + "_clustcd11_vaxhigh_vx.txt";
-	std::ofstream clustcd11_vaxhigh_vx_file;
-	clustcd11_vaxhigh_vx_file.open(clustcd11_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd11.size(); i++) {
-			clustcd11_vaxhigh_vx_file << vaccinations[vaxhighcd11[i]][d] << "\t";
-			clustcd11_vaxhigh_file << coviddeaths[vaxhighcd11[i]][d] << "\t";
-		}
-		clustcd11_vaxhigh_vx_file << std::endl;
-		clustcd11_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd12_vaxlow_filename;
-	clustcd12_vaxlow_filename = s + "_clustcd12_vaxlow.txt";
-	std::ofstream clustcd12_vaxlow_file;
-	clustcd12_vaxlow_file.open(clustcd12_vaxlow_filename);
-	std::string clustcd12_vaxlow_vx_filename;
-	clustcd12_vaxlow_vx_filename = s + "_clustcd12_vaxlow_vx.txt";
-	std::ofstream clustcd12_vaxlow_vx_file;
-	clustcd12_vaxlow_vx_file.open(clustcd12_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd12.size(); i++) {
-			clustcd12_vaxlow_vx_file << vaccinations[vaxlowcd12[i]][d] << "\t";
-			clustcd12_vaxlow_file << coviddeaths[vaxlowcd12[i]][d] << "\t";
-		}
-		clustcd12_vaxlow_vx_file << std::endl;
-		clustcd12_vaxlow_file << std::endl;
-	}
-	std::string clustcd12_vaxmed_filename;
-	clustcd12_vaxmed_filename = s + "_clustcd12_vaxmed.txt";
-	std::ofstream clustcd12_vaxmed_file;
-	clustcd12_vaxmed_file.open(clustcd12_vaxmed_filename);
-	std::string clustcd12_vaxmed_vx_filename;
-	clustcd12_vaxmed_vx_filename = s + "_clustcd12_vaxmed_vx.txt";
-	std::ofstream clustcd12_vaxmed_vx_file;
-	clustcd12_vaxmed_vx_file.open(clustcd12_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd12.size(); i++) {
-			clustcd12_vaxmed_vx_file << vaccinations[vaxmedcd12[i]][d] << "\t";
-			clustcd12_vaxmed_file << coviddeaths[vaxmedcd12[i]][d] << "\t";
-		}
-		clustcd12_vaxmed_vx_file << std::endl;
-		clustcd12_vaxmed_file << std::endl;
-	}
-	std::string clustcd12_vaxhigh_filename;
-	clustcd12_vaxhigh_filename = s + "_clustcd12_vaxhigh.txt";
-	std::ofstream clustcd12_vaxhigh_file;
-	clustcd12_vaxhigh_file.open(clustcd12_vaxhigh_filename);
-	std::string clustcd12_vaxhigh_vx_filename;
-	clustcd12_vaxhigh_vx_filename = s + "_clustcd12_vaxhigh_vx.txt";
-	std::ofstream clustcd12_vaxhigh_vx_file;
-	clustcd12_vaxhigh_vx_file.open(clustcd12_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd12.size(); i++) {
-			clustcd12_vaxhigh_vx_file << vaccinations[vaxhighcd12[i]][d] << "\t";
-			clustcd12_vaxhigh_file << coviddeaths[vaxhighcd12[i]][d] << "\t";
-		}
-		clustcd12_vaxhigh_vx_file << std::endl;
-		clustcd12_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd13_vaxlow_filename;
-	clustcd13_vaxlow_filename = s + "_clustcd13_vaxlow.txt";
-	std::ofstream clustcd13_vaxlow_file;
-	clustcd13_vaxlow_file.open(clustcd13_vaxlow_filename);
-	std::string clustcd13_vaxlow_vx_filename;
-	clustcd13_vaxlow_vx_filename = s + "_clustcd13_vaxlow_vx.txt";
-	std::ofstream clustcd13_vaxlow_vx_file;
-	clustcd13_vaxlow_vx_file.open(clustcd13_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd13.size(); i++) {
-			clustcd13_vaxlow_vx_file << vaccinations[vaxlowcd13[i]][d] << "\t";
-			clustcd13_vaxlow_file << coviddeaths[vaxlowcd13[i]][d] << "\t";
-		}
-		clustcd13_vaxlow_vx_file << std::endl;
-		clustcd13_vaxlow_file << std::endl;
-	}
-	std::string clustcd13_vaxmed_filename;
-	clustcd13_vaxmed_filename = s + "_clustcd13_vaxmed.txt";
-	std::ofstream clustcd13_vaxmed_file;
-	clustcd13_vaxmed_file.open(clustcd13_vaxmed_filename);
-	std::string clustcd13_vaxmed_vx_filename;
-	clustcd13_vaxmed_vx_filename = s + "_clustcd13_vaxmed_vx.txt";
-	std::ofstream clustcd13_vaxmed_vx_file;
-	clustcd13_vaxmed_vx_file.open(clustcd13_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd13.size(); i++) {
-			clustcd13_vaxmed_vx_file << vaccinations[vaxmedcd13[i]][d] << "\t";
-			clustcd13_vaxmed_file << coviddeaths[vaxmedcd13[i]][d] << "\t";
-		}
-		clustcd13_vaxmed_vx_file << std::endl;
-		clustcd13_vaxmed_file << std::endl;
-	}
-	std::string clustcd13_vaxhigh_filename;
-	clustcd13_vaxhigh_filename = s + "_clustcd13_vaxhigh.txt";
-	std::ofstream clustcd13_vaxhigh_file;
-	clustcd13_vaxhigh_file.open(clustcd13_vaxhigh_filename);
-	std::string clustcd13_vaxhigh_vx_filename;
-	clustcd13_vaxhigh_vx_filename = s + "_clustcd13_vaxhigh_vx.txt";
-	std::ofstream clustcd13_vaxhigh_vx_file;
-	clustcd13_vaxhigh_vx_file.open(clustcd13_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd13.size(); i++) {
-			clustcd13_vaxhigh_vx_file << vaccinations[vaxhighcd13[i]][d] << "\t";
-			clustcd13_vaxhigh_file << coviddeaths[vaxhighcd13[i]][d] << "\t";
-		}
-		clustcd13_vaxhigh_vx_file << std::endl;
-		clustcd13_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd14_vaxlow_filename;
-	clustcd14_vaxlow_filename = s + "_clustcd14_vaxlow.txt";
-	std::ofstream clustcd14_vaxlow_file;
-	clustcd14_vaxlow_file.open(clustcd14_vaxlow_filename);
-	std::string clustcd14_vaxlow_vx_filename;
-	clustcd14_vaxlow_vx_filename = s + "_clustcd14_vaxlow_vx.txt";
-	std::ofstream clustcd14_vaxlow_vx_file;
-	clustcd14_vaxlow_vx_file.open(clustcd14_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd14.size(); i++) {
-			clustcd14_vaxlow_vx_file << vaccinations[vaxlowcd14[i]][d] << "\t";
-			clustcd14_vaxlow_file << coviddeaths[vaxlowcd14[i]][d] << "\t";
-		}
-		clustcd14_vaxlow_vx_file << std::endl;
-		clustcd14_vaxlow_file << std::endl;
-	}
-	std::string clustcd14_vaxmed_filename;
-	clustcd14_vaxmed_filename = s + "_clustcd14_vaxmed.txt";
-	std::ofstream clustcd14_vaxmed_file;
-	clustcd14_vaxmed_file.open(clustcd14_vaxmed_filename);
-	std::string clustcd14_vaxmed_vx_filename;
-	clustcd14_vaxmed_vx_filename = s + "_clustcd14_vaxmed_vx.txt";
-	std::ofstream clustcd14_vaxmed_vx_file;
-	clustcd14_vaxmed_vx_file.open(clustcd14_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd14.size(); i++) {
-			clustcd14_vaxmed_vx_file << vaccinations[vaxmedcd14[i]][d] << "\t";
-			clustcd14_vaxmed_file << coviddeaths[vaxmedcd14[i]][d] << "\t";
-		}
-		clustcd14_vaxmed_vx_file << std::endl;
-		clustcd14_vaxmed_file << std::endl;
-	}
-	std::string clustcd14_vaxhigh_filename;
-	clustcd14_vaxhigh_filename = s + "_clustcd14_vaxhigh.txt";
-	std::ofstream clustcd14_vaxhigh_file;
-	clustcd14_vaxhigh_file.open(clustcd14_vaxhigh_filename);
-	std::string clustcd14_vaxhigh_vx_filename;
-	clustcd14_vaxhigh_vx_filename = s + "_clustcd14_vaxhigh_vx.txt";
-	std::ofstream clustcd14_vaxhigh_vx_file;
-	clustcd14_vaxhigh_vx_file.open(clustcd14_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd14.size(); i++) {
-			clustcd14_vaxhigh_vx_file << vaccinations[vaxhighcd14[i]][d] << "\t";
-			clustcd14_vaxhigh_file << coviddeaths[vaxhighcd14[i]][d] << "\t";
-		}
-		clustcd14_vaxhigh_vx_file << std::endl;
-		clustcd14_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd15_vaxlow_filename;
-	clustcd15_vaxlow_filename = s + "_clustcd15_vaxlow.txt";
-	std::ofstream clustcd15_vaxlow_file;
-	clustcd15_vaxlow_file.open(clustcd15_vaxlow_filename);
-	std::string clustcd15_vaxlow_vx_filename;
-	clustcd15_vaxlow_vx_filename = s + "_clustcd15_vaxlow_vx.txt";
-	std::ofstream clustcd15_vaxlow_vx_file;
-	clustcd15_vaxlow_vx_file.open(clustcd15_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd15.size(); i++) {
-			clustcd15_vaxlow_vx_file << vaccinations[vaxlowcd15[i]][d] << "\t";
-			clustcd15_vaxlow_file << coviddeaths[vaxlowcd15[i]][d] << "\t";
-		}
-		clustcd15_vaxlow_vx_file << std::endl;
-		clustcd15_vaxlow_file << std::endl;
-	}
-	std::string clustcd15_vaxmed_filename;
-	clustcd15_vaxmed_filename = s + "_clustcd15_vaxmed.txt";
-	std::ofstream clustcd15_vaxmed_file;
-	clustcd15_vaxmed_file.open(clustcd15_vaxmed_filename);
-	std::string clustcd15_vaxmed_vx_filename;
-	clustcd15_vaxmed_vx_filename = s + "_clustcd15_vaxmed_vx.txt";
-	std::ofstream clustcd15_vaxmed_vx_file;
-	clustcd15_vaxmed_vx_file.open(clustcd15_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd15.size(); i++) {
-			clustcd15_vaxmed_vx_file << vaccinations[vaxmedcd15[i]][d] << "\t";
-			clustcd15_vaxmed_file << coviddeaths[vaxmedcd15[i]][d] << "\t";
-		}
-		clustcd15_vaxmed_vx_file << std::endl;
-		clustcd15_vaxmed_file << std::endl;
-	}
-	std::string clustcd15_vaxhigh_filename;
-	clustcd15_vaxhigh_filename = s + "_clustcd15_vaxhigh.txt";
-	std::ofstream clustcd15_vaxhigh_file;
-	clustcd15_vaxhigh_file.open(clustcd15_vaxhigh_filename);
-	std::string clustcd15_vaxhigh_vx_filename;
-	clustcd15_vaxhigh_vx_filename = s + "_clustcd15_vaxhigh_vx.txt";
-	std::ofstream clustcd15_vaxhigh_vx_file;
-	clustcd15_vaxhigh_vx_file.open(clustcd15_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd15.size(); i++) {
-			clustcd15_vaxhigh_vx_file << vaccinations[vaxhighcd15[i]][d] << "\t";
-			clustcd15_vaxhigh_file << coviddeaths[vaxhighcd15[i]][d] << "\t";
-		}
-		clustcd15_vaxhigh_vx_file << std::endl;
-		clustcd15_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd16_vaxlow_filename;
-	clustcd16_vaxlow_filename = s + "_clustcd16_vaxlow.txt";
-	std::ofstream clustcd16_vaxlow_file;
-	clustcd16_vaxlow_file.open(clustcd16_vaxlow_filename);
-	std::string clustcd16_vaxlow_vx_filename;
-	clustcd16_vaxlow_vx_filename = s + "_clustcd16_vaxlow_vx.txt";
-	std::ofstream clustcd16_vaxlow_vx_file;
-	clustcd16_vaxlow_vx_file.open(clustcd16_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd16.size(); i++) {
-			clustcd16_vaxlow_vx_file << vaccinations[vaxlowcd16[i]][d] << "\t";
-			clustcd16_vaxlow_file << coviddeaths[vaxlowcd16[i]][d] << "\t";
-		}
-		clustcd16_vaxlow_vx_file << std::endl;
-		clustcd16_vaxlow_file << std::endl;
-	}
-	std::string clustcd16_vaxmed_filename;
-	clustcd16_vaxmed_filename = s + "_clustcd16_vaxmed.txt";
-	std::ofstream clustcd16_vaxmed_file;
-	clustcd16_vaxmed_file.open(clustcd16_vaxmed_filename);
-	std::string clustcd16_vaxmed_vx_filename;
-	clustcd16_vaxmed_vx_filename = s + "_clustcd16_vaxmed_vx.txt";
-	std::ofstream clustcd16_vaxmed_vx_file;
-	clustcd16_vaxmed_vx_file.open(clustcd16_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd16.size(); i++) {
-			clustcd16_vaxmed_vx_file << vaccinations[vaxmedcd16[i]][d] << "\t";
-			clustcd16_vaxmed_file << coviddeaths[vaxmedcd16[i]][d] << "\t";
-		}
-		clustcd16_vaxmed_vx_file << std::endl;
-		clustcd16_vaxmed_file << std::endl;
-	}
-	std::string clustcd16_vaxhigh_filename;
-	clustcd16_vaxhigh_filename = s + "_clustcd16_vaxhigh.txt";
-	std::ofstream clustcd16_vaxhigh_file;
-	clustcd16_vaxhigh_file.open(clustcd16_vaxhigh_filename);
-	std::string clustcd16_vaxhigh_vx_filename;
-	clustcd16_vaxhigh_vx_filename = s + "_clustcd16_vaxhigh_vx.txt";
-	std::ofstream clustcd16_vaxhigh_vx_file;
-	clustcd16_vaxhigh_vx_file.open(clustcd16_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd16.size(); i++) {
-			clustcd16_vaxhigh_vx_file << vaccinations[vaxhighcd16[i]][d] << "\t";
-			clustcd16_vaxhigh_file << coviddeaths[vaxhighcd16[i]][d] << "\t";
-		}
-		clustcd16_vaxhigh_vx_file << std::endl;
-		clustcd16_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd17_vaxlow_filename;
-	clustcd17_vaxlow_filename = s + "_clustcd17_vaxlow.txt";
-	std::ofstream clustcd17_vaxlow_file;
-	clustcd17_vaxlow_file.open(clustcd17_vaxlow_filename);
-	std::string clustcd17_vaxlow_vx_filename;
-	clustcd17_vaxlow_vx_filename = s + "_clustcd17_vaxlow_vx.txt";
-	std::ofstream clustcd17_vaxlow_vx_file;
-	clustcd17_vaxlow_vx_file.open(clustcd17_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd17.size(); i++) {
-			clustcd17_vaxlow_vx_file << vaccinations[vaxlowcd17[i]][d] << "\t";
-			clustcd17_vaxlow_file << coviddeaths[vaxlowcd17[i]][d] << "\t";
-		}
-		clustcd17_vaxlow_vx_file << std::endl;
-		clustcd17_vaxlow_file << std::endl;
-	}
-	std::string clustcd17_vaxmed_filename;
-	clustcd17_vaxmed_filename = s + "_clustcd17_vaxmed.txt";
-	std::ofstream clustcd17_vaxmed_file;
-	clustcd17_vaxmed_file.open(clustcd17_vaxmed_filename);
-	std::string clustcd17_vaxmed_vx_filename;
-	clustcd17_vaxmed_vx_filename = s + "_clustcd17_vaxmed_vx.txt";
-	std::ofstream clustcd17_vaxmed_vx_file;
-	clustcd17_vaxmed_vx_file.open(clustcd17_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd17.size(); i++) {
-			clustcd17_vaxmed_vx_file << vaccinations[vaxmedcd17[i]][d] << "\t";
-			clustcd17_vaxmed_file << coviddeaths[vaxmedcd17[i]][d] << "\t";
-		}
-		clustcd17_vaxmed_vx_file << std::endl;
-		clustcd17_vaxmed_file << std::endl;
-	}
-	std::string clustcd17_vaxhigh_filename;
-	clustcd17_vaxhigh_filename = s + "_clustcd17_vaxhigh.txt";
-	std::ofstream clustcd17_vaxhigh_file;
-	clustcd17_vaxhigh_file.open(clustcd17_vaxhigh_filename);
-	std::string clustcd17_vaxhigh_vx_filename;
-	clustcd17_vaxhigh_vx_filename = s + "_clustcd17_vaxhigh_vx.txt";
-	std::ofstream clustcd17_vaxhigh_vx_file;
-	clustcd17_vaxhigh_vx_file.open(clustcd17_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd17.size(); i++) {
-			clustcd17_vaxhigh_vx_file << vaccinations[vaxhighcd17[i]][d] << "\t";
-			clustcd17_vaxhigh_file << coviddeaths[vaxhighcd17[i]][d] << "\t";
-		}
-		clustcd17_vaxhigh_vx_file << std::endl;
-		clustcd17_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd18_vaxlow_filename;
-	clustcd18_vaxlow_filename = s + "_clustcd18_vaxlow.txt";
-	std::ofstream clustcd18_vaxlow_file;
-	clustcd18_vaxlow_file.open(clustcd18_vaxlow_filename);
-	std::string clustcd18_vaxlow_vx_filename;
-	clustcd18_vaxlow_vx_filename = s + "_clustcd18_vaxlow_vx.txt";
-	std::ofstream clustcd18_vaxlow_vx_file;
-	clustcd18_vaxlow_vx_file.open(clustcd18_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd18.size(); i++) {
-			clustcd18_vaxlow_vx_file << vaccinations[vaxlowcd18[i]][d] << "\t";
-			clustcd18_vaxlow_file << coviddeaths[vaxlowcd18[i]][d] << "\t";
-		}
-		clustcd18_vaxlow_vx_file << std::endl;
-		clustcd18_vaxlow_file << std::endl;
-	}
-	std::string clustcd18_vaxmed_filename;
-	clustcd18_vaxmed_filename = s + "_clustcd18_vaxmed.txt";
-	std::ofstream clustcd18_vaxmed_file;
-	clustcd18_vaxmed_file.open(clustcd18_vaxmed_filename);
-	std::string clustcd18_vaxmed_vx_filename;
-	clustcd18_vaxmed_vx_filename = s + "_clustcd18_vaxmed_vx.txt";
-	std::ofstream clustcd18_vaxmed_vx_file;
-	clustcd18_vaxmed_vx_file.open(clustcd18_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd18.size(); i++) {
-			clustcd18_vaxmed_vx_file << vaccinations[vaxmedcd18[i]][d] << "\t";
-			clustcd18_vaxmed_file << coviddeaths[vaxmedcd18[i]][d] << "\t";
-		}
-		clustcd18_vaxmed_vx_file << std::endl;
-		clustcd18_vaxmed_file << std::endl;
-	}
-	std::string clustcd18_vaxhigh_filename;
-	clustcd18_vaxhigh_filename = s + "_clustcd18_vaxhigh.txt";
-	std::ofstream clustcd18_vaxhigh_file;
-	clustcd18_vaxhigh_file.open(clustcd18_vaxhigh_filename);
-	std::string clustcd18_vaxhigh_vx_filename;
-	clustcd18_vaxhigh_vx_filename = s + "_clustcd18_vaxhigh_vx.txt";
-	std::ofstream clustcd18_vaxhigh_vx_file;
-	clustcd18_vaxhigh_vx_file.open(clustcd18_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd18.size(); i++) {
-			clustcd18_vaxhigh_vx_file << vaccinations[vaxhighcd18[i]][d] << "\t";
-			clustcd18_vaxhigh_file << coviddeaths[vaxhighcd18[i]][d] << "\t";
-		}
-		clustcd18_vaxhigh_vx_file << std::endl;
-		clustcd18_vaxhigh_file << std::endl;
-	}
-
-	std::string clustcd19_vaxlow_filename;
-	clustcd19_vaxlow_filename = s + "_clustcd19_vaxlow.txt";
-	std::ofstream clustcd19_vaxlow_file;
-	clustcd19_vaxlow_file.open(clustcd19_vaxlow_filename);
-	std::string clustcd19_vaxlow_vx_filename;
-	clustcd19_vaxlow_vx_filename = s + "_clustcd19_vaxlow_vx.txt";
-	std::ofstream clustcd19_vaxlow_vx_file;
-	clustcd19_vaxlow_vx_file.open(clustcd19_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowcd19.size(); i++) {
-			clustcd19_vaxlow_vx_file << vaccinations[vaxlowcd19[i]][d] << "\t";
-			clustcd19_vaxlow_file << coviddeaths[vaxlowcd19[i]][d] << "\t";
-		}
-		clustcd19_vaxlow_vx_file << std::endl;
-		clustcd19_vaxlow_file << std::endl;
-	}
-	std::string clustcd19_vaxmed_filename;
-	clustcd19_vaxmed_filename = s + "_clustcd19_vaxmed.txt";
-	std::ofstream clustcd19_vaxmed_file;
-	clustcd19_vaxmed_file.open(clustcd19_vaxmed_filename);
-	std::string clustcd19_vaxmed_vx_filename;
-	clustcd19_vaxmed_vx_filename = s + "_clustcd19_vaxmed_vx.txt";
-	std::ofstream clustcd19_vaxmed_vx_file;
-	clustcd19_vaxmed_vx_file.open(clustcd19_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedcd19.size(); i++) {
-			clustcd19_vaxmed_vx_file << vaccinations[vaxmedcd19[i]][d] << "\t";
-			clustcd19_vaxmed_file << coviddeaths[vaxmedcd19[i]][d] << "\t";
-		}
-		clustcd19_vaxmed_vx_file << std::endl;
-		clustcd19_vaxmed_file << std::endl;
-	}
-	std::string clustcd19_vaxhigh_filename;
-	clustcd19_vaxhigh_filename = s + "_clustcd19_vaxhigh.txt";
-	std::ofstream clustcd19_vaxhigh_file;
-	clustcd19_vaxhigh_file.open(clustcd19_vaxhigh_filename);
-	std::string clustcd19_vaxhigh_vx_filename;
-	clustcd19_vaxhigh_vx_filename = s + "_clustcd19_vaxhigh_vx.txt";
-	std::ofstream clustcd19_vaxhigh_vx_file;
-	clustcd19_vaxhigh_vx_file.open(clustcd19_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighcd19.size(); i++) {
-			clustcd19_vaxhigh_vx_file << vaccinations[vaxhighcd19[i]][d] << "\t";
-			clustcd19_vaxhigh_file << coviddeaths[vaxhighcd19[i]][d] << "\t";
-		}
-		clustcd19_vaxhigh_vx_file << std::endl;
-		clustcd19_vaxhigh_file << std::endl;
-	}
-
-
-
-
-
-
-
-
-
-	std::string clustem0_vaxlow_filename;
-	clustem0_vaxlow_filename = s + "_clustem0_vaxlow.txt";
-	std::ofstream clustem0_vaxlow_file;
-	clustem0_vaxlow_file.open(clustem0_vaxlow_filename);
-
-	std::string clustem0_vaxlow_vx_filename;
-	clustem0_vaxlow_vx_filename = s + "_clustem0_vaxlow_vx.txt";
-	std::ofstream clustem0_vaxlow_vx_file;
-	clustem0_vaxlow_vx_file.open(clustem0_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem0.size(); i++) {
-			clustem0_vaxlow_vx_file << vaccinations[vaxlowem0[i]][d] << "\t";
-			clustem0_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem0[i]][d] << "\t";
-		}
-		clustem0_vaxlow_vx_file << std::endl;
-		clustem0_vaxlow_file << std::endl;
-	}
-
-
-	std::string clustem0_vaxmed_filename;
-	clustem0_vaxmed_filename = s + "_clustem0_vaxmed.txt";
-	std::ofstream clustem0_vaxmed_file;
-	clustem0_vaxmed_file.open(clustem0_vaxmed_filename);
-
-	std::string clustem0_vaxmed_vx_filename;
-	clustem0_vaxmed_vx_filename = s + "_clustem0_vaxmed_vx.txt";
-	std::ofstream clustem0_vaxmed_vx_file;
-	clustem0_vaxmed_vx_file.open(clustem0_vaxmed_vx_filename);
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem0.size(); i++) {
-			clustem0_vaxmed_vx_file << vaccinations[vaxmedem0[i]][d] << "\t";
-			clustem0_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem0[i]][d] << "\t";
-		}
-		clustem0_vaxmed_vx_file << std::endl;
-		clustem0_vaxmed_file << std::endl;
-	}
-
-
-	std::string clustem0_vaxhigh_filename;
-	clustem0_vaxhigh_filename = s + "_clustem0_vaxhigh.txt";
-	std::ofstream clustem0_vaxhigh_file;
-	clustem0_vaxhigh_file.open(clustem0_vaxhigh_filename);
-
-	std::string clustem0_vaxhigh_vx_filename;
-	clustem0_vaxhigh_vx_filename = s + "_clustem0_vaxhigh_vx.txt";
-	std::ofstream clustem0_vaxhigh_vx_file;
-	clustem0_vaxhigh_vx_file.open(clustem0_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem0.size(); i++) {
-			clustem0_vaxhigh_vx_file << vaccinations[vaxhighem0[i]][d] << "\t";
-			clustem0_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem0[i]][d] << "\t";
-		}
-		clustem0_vaxhigh_vx_file << std::endl;
-		clustem0_vaxhigh_file << std::endl;
-	}
-
-
-	std::string clustem1_vaxlow_filename;
-	clustem1_vaxlow_filename = s + "_clustem1_vaxlow.txt";
-	std::ofstream clustem1_vaxlow_file;
-	clustem1_vaxlow_file.open(clustem1_vaxlow_filename);
-
-	std::string clustem1_vaxlow_vx_filename;
-	clustem1_vaxlow_vx_filename = s + "_clustem1_vaxlow_vx.txt";
-	std::ofstream clustem1_vaxlow_vx_file;
-	clustem1_vaxlow_vx_file.open(clustem1_vaxlow_vx_filename);
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem1.size(); i++) {
-			clustem1_vaxlow_vx_file << vaccinations[vaxlowem1[i]][d] << "\t";
-			clustem1_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem1[i]][d] << "\t";
-		}
-		clustem1_vaxlow_vx_file << std::endl;
-		clustem1_vaxlow_file << std::endl;
-	}
-
-
-	std::string clustem1_vaxmed_filename;
-	clustem1_vaxmed_filename = s + "_clustem1_vaxmed.txt";
-	std::ofstream clustem1_vaxmed_file;
-	clustem1_vaxmed_file.open(clustem1_vaxmed_filename);
-
-	std::string clustem1_vaxmed_vx_filename;
-	clustem1_vaxmed_vx_filename = s + "_clustem1_vaxmed_vx.txt";
-	std::ofstream clustem1_vaxmed_vx_file;
-	clustem1_vaxmed_vx_file.open(clustem1_vaxmed_vx_filename);
-
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem1.size(); i++) {
-			clustem1_vaxmed_vx_file << vaccinations[vaxmedem1[i]][d] << "\t";
-			clustem1_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem1[i]][d] << "\t";
-		}
-		clustem1_vaxmed_vx_file << std::endl;
-		clustem1_vaxmed_file << std::endl;
-	}
-
-	std::string clustem1_vaxhigh_filename;
-	clustem1_vaxhigh_filename = s + "_clustem1_vaxhigh.txt";
-	std::ofstream clustem1_vaxhigh_file;
-	clustem1_vaxhigh_file.open(clustem1_vaxhigh_filename);
-
-	std::string clustem1_vaxhigh_vx_filename;
-	clustem1_vaxhigh_vx_filename = s + "_clustem1_vaxhigh_vx.txt";
-	std::ofstream clustem1_vaxhigh_vx_file;
-	clustem1_vaxhigh_vx_file.open(clustem1_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem1.size(); i++) {
-			clustem1_vaxhigh_vx_file << vaccinations[vaxhighem1[i]][d] << "\t";
-			clustem1_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem1[i]][d] << "\t";
-		}
-		clustem1_vaxhigh_vx_file << std::endl;
-		clustem1_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem2_vaxlow_filename;
-	clustem2_vaxlow_filename = s + "_clustem2_vaxlow.txt";
-	std::ofstream clustem2_vaxlow_file;
-	clustem2_vaxlow_file.open(clustem2_vaxlow_filename);
-	std::string clustem2_vaxlow_vx_filename;
-	clustem2_vaxlow_vx_filename = s + "_clustem2_vaxlow_vx.txt";
-	std::ofstream clustem2_vaxlow_vx_file;
-	clustem2_vaxlow_vx_file.open(clustem2_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem2.size(); i++) {
-			clustem2_vaxlow_vx_file << vaccinations[vaxlowem2[i]][d] << "\t";
-			clustem2_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem2[i]][d] << "\t";
-		}
-		clustem2_vaxlow_vx_file << std::endl;
-		clustem2_vaxlow_file << std::endl;
-	}
-	std::string clustem2_vaxmed_filename;
-	clustem2_vaxmed_filename = s + "_clustem2_vaxmed.txt";
-	std::ofstream clustem2_vaxmed_file;
-	clustem2_vaxmed_file.open(clustem2_vaxmed_filename);
-	std::string clustem2_vaxmed_vx_filename;
-	clustem2_vaxmed_vx_filename = s + "_clustem2_vaxmed_vx.txt";
-	std::ofstream clustem2_vaxmed_vx_file;
-	clustem2_vaxmed_vx_file.open(clustem2_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem2.size(); i++) {
-			clustem2_vaxmed_vx_file << vaccinations[vaxmedem2[i]][d] << "\t";
-			clustem2_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem2[i]][d] << "\t";
-		}
-		clustem2_vaxmed_vx_file << std::endl;
-		clustem2_vaxmed_file << std::endl;
-	}
-	std::string clustem2_vaxhigh_filename;
-	clustem2_vaxhigh_filename = s + "_clustem2_vaxhigh.txt";
-	std::ofstream clustem2_vaxhigh_file;
-	clustem2_vaxhigh_file.open(clustem2_vaxhigh_filename);
-	std::string clustem2_vaxhigh_vx_filename;
-	clustem2_vaxhigh_vx_filename = s + "_clustem2_vaxhigh_vx.txt";
-	std::ofstream clustem2_vaxhigh_vx_file;
-	clustem2_vaxhigh_vx_file.open(clustem2_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem2.size(); i++) {
-			clustem2_vaxhigh_vx_file << vaccinations[vaxhighem2[i]][d] << "\t";
-			clustem2_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem2[i]][d] << "\t";
-		}
-		clustem2_vaxhigh_vx_file << std::endl;
-		clustem2_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem3_vaxlow_filename;
-	clustem3_vaxlow_filename = s + "_clustem3_vaxlow.txt";
-	std::ofstream clustem3_vaxlow_file;
-	clustem3_vaxlow_file.open(clustem3_vaxlow_filename);
-	std::string clustem3_vaxlow_vx_filename;
-	clustem3_vaxlow_vx_filename = s + "_clustem3_vaxlow_vx.txt";
-	std::ofstream clustem3_vaxlow_vx_file;
-	clustem3_vaxlow_vx_file.open(clustem3_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem3.size(); i++) {
-			clustem3_vaxlow_vx_file << vaccinations[vaxlowem3[i]][d] << "\t";
-			clustem3_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem3[i]][d] << "\t";
-		}
-		clustem3_vaxlow_vx_file << std::endl;
-		clustem3_vaxlow_file << std::endl;
-	}
-	std::string clustem3_vaxmed_filename;
-	clustem3_vaxmed_filename = s + "_clustem3_vaxmed.txt";
-	std::ofstream clustem3_vaxmed_file;
-	clustem3_vaxmed_file.open(clustem3_vaxmed_filename);
-	std::string clustem3_vaxmed_vx_filename;
-	clustem3_vaxmed_vx_filename = s + "_clustem3_vaxmed_vx.txt";
-	std::ofstream clustem3_vaxmed_vx_file;
-	clustem3_vaxmed_vx_file.open(clustem3_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem3.size(); i++) {
-			clustem3_vaxmed_vx_file << vaccinations[vaxmedem3[i]][d] << "\t";
-			clustem3_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem3[i]][d] << "\t";
-		}
-		clustem3_vaxmed_vx_file << std::endl;
-		clustem3_vaxmed_file << std::endl;
-	}
-	std::string clustem3_vaxhigh_filename;
-	clustem3_vaxhigh_filename = s + "_clustem3_vaxhigh.txt";
-	std::ofstream clustem3_vaxhigh_file;
-	clustem3_vaxhigh_file.open(clustem3_vaxhigh_filename);
-	std::string clustem3_vaxhigh_vx_filename;
-	clustem3_vaxhigh_vx_filename = s + "_clustem3_vaxhigh_vx.txt";
-	std::ofstream clustem3_vaxhigh_vx_file;
-	clustem3_vaxhigh_vx_file.open(clustem3_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem3.size(); i++) {
-			clustem3_vaxhigh_vx_file << vaccinations[vaxhighem3[i]][d] << "\t";
-			clustem3_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem3[i]][d] << "\t";
-		}
-		clustem3_vaxhigh_vx_file << std::endl;
-		clustem3_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem4_vaxlow_filename;
-	clustem4_vaxlow_filename = s + "_clustem4_vaxlow.txt";
-	std::ofstream clustem4_vaxlow_file;
-	clustem4_vaxlow_file.open(clustem4_vaxlow_filename);
-	std::string clustem4_vaxlow_vx_filename;
-	clustem4_vaxlow_vx_filename = s + "_clustem4_vaxlow_vx.txt";
-	std::ofstream clustem4_vaxlow_vx_file;
-	clustem4_vaxlow_vx_file.open(clustem4_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem4.size(); i++) {
-			clustem4_vaxlow_vx_file << vaccinations[vaxlowem4[i]][d] << "\t";
-			clustem4_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem4[i]][d] << "\t";
-		}
-		clustem4_vaxlow_vx_file << std::endl;
-		clustem4_vaxlow_file << std::endl;
-	}
-	std::string clustem4_vaxmed_filename;
-	clustem4_vaxmed_filename = s + "_clustem4_vaxmed.txt";
-	std::ofstream clustem4_vaxmed_file;
-	clustem4_vaxmed_file.open(clustem4_vaxmed_filename);
-	std::string clustem4_vaxmed_vx_filename;
-	clustem4_vaxmed_vx_filename = s + "_clustem4_vaxmed_vx.txt";
-	std::ofstream clustem4_vaxmed_vx_file;
-	clustem4_vaxmed_vx_file.open(clustem4_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem4.size(); i++) {
-			clustem4_vaxmed_vx_file << vaccinations[vaxmedem4[i]][d] << "\t";
-			clustem4_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem4[i]][d] << "\t";
-		}
-		clustem4_vaxmed_vx_file << std::endl;
-		clustem4_vaxmed_file << std::endl;
-	}
-	std::string clustem4_vaxhigh_filename;
-	clustem4_vaxhigh_filename = s + "_clustem4_vaxhigh.txt";
-	std::ofstream clustem4_vaxhigh_file;
-	clustem4_vaxhigh_file.open(clustem4_vaxhigh_filename);
-	std::string clustem4_vaxhigh_vx_filename;
-	clustem4_vaxhigh_vx_filename = s + "_clustem4_vaxhigh_vx.txt";
-	std::ofstream clustem4_vaxhigh_vx_file;
-	clustem4_vaxhigh_vx_file.open(clustem4_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem4.size(); i++) {
-			clustem4_vaxhigh_vx_file << vaccinations[vaxhighem4[i]][d] << "\t";
-			clustem4_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem4[i]][d] << "\t";
-		}
-		clustem4_vaxhigh_vx_file << std::endl;
-		clustem4_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem5_vaxlow_filename;
-	clustem5_vaxlow_filename = s + "_clustem5_vaxlow.txt";
-	std::ofstream clustem5_vaxlow_file;
-	clustem5_vaxlow_file.open(clustem5_vaxlow_filename);
-	std::string clustem5_vaxlow_vx_filename;
-	clustem5_vaxlow_vx_filename = s + "_clustem5_vaxlow_vx.txt";
-	std::ofstream clustem5_vaxlow_vx_file;
-	clustem5_vaxlow_vx_file.open(clustem5_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem5.size(); i++) {
-			clustem5_vaxlow_vx_file << vaccinations[vaxlowem5[i]][d] << "\t";
-			clustem5_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem5[i]][d] << "\t";
-		}
-		clustem5_vaxlow_vx_file << std::endl;
-		clustem5_vaxlow_file << std::endl;
-	}
-	std::string clustem5_vaxmed_filename;
-	clustem5_vaxmed_filename = s + "_clustem5_vaxmed.txt";
-	std::ofstream clustem5_vaxmed_file;
-	clustem5_vaxmed_file.open(clustem5_vaxmed_filename);
-	std::string clustem5_vaxmed_vx_filename;
-	clustem5_vaxmed_vx_filename = s + "_clustem5_vaxmed_vx.txt";
-	std::ofstream clustem5_vaxmed_vx_file;
-	clustem5_vaxmed_vx_file.open(clustem5_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem5.size(); i++) {
-			clustem5_vaxmed_vx_file << vaccinations[vaxmedem5[i]][d] << "\t";
-			clustem5_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem5[i]][d] << "\t";
-		}
-		clustem5_vaxmed_vx_file << std::endl;
-		clustem5_vaxmed_file << std::endl;
-	}
-	std::string clustem5_vaxhigh_filename;
-	clustem5_vaxhigh_filename = s + "_clustem5_vaxhigh.txt";
-	std::ofstream clustem5_vaxhigh_file;
-	clustem5_vaxhigh_file.open(clustem5_vaxhigh_filename);
-	std::string clustem5_vaxhigh_vx_filename;
-	clustem5_vaxhigh_vx_filename = s + "_clustem5_vaxhigh_vx.txt";
-	std::ofstream clustem5_vaxhigh_vx_file;
-	clustem5_vaxhigh_vx_file.open(clustem5_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem5.size(); i++) {
-			clustem5_vaxhigh_vx_file << vaccinations[vaxhighem5[i]][d] << "\t";
-			clustem5_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem5[i]][d] << "\t";
-		}
-		clustem5_vaxhigh_vx_file << std::endl;
-		clustem5_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem6_vaxlow_filename;
-	clustem6_vaxlow_filename = s + "_clustem6_vaxlow.txt";
-	std::ofstream clustem6_vaxlow_file;
-	clustem6_vaxlow_file.open(clustem6_vaxlow_filename);
-	std::string clustem6_vaxlow_vx_filename;
-	clustem6_vaxlow_vx_filename = s + "_clustem6_vaxlow_vx.txt";
-	std::ofstream clustem6_vaxlow_vx_file;
-	clustem6_vaxlow_vx_file.open(clustem6_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem6.size(); i++) {
-			clustem6_vaxlow_vx_file << vaccinations[vaxlowem6[i]][d] << "\t";
-			clustem6_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem6[i]][d] << "\t";
-		}
-		clustem6_vaxlow_vx_file << std::endl;
-		clustem6_vaxlow_file << std::endl;
-	}
-	std::string clustem6_vaxmed_filename;
-	clustem6_vaxmed_filename = s + "_clustem6_vaxmed.txt";
-	std::ofstream clustem6_vaxmed_file;
-	clustem6_vaxmed_file.open(clustem6_vaxmed_filename);
-	std::string clustem6_vaxmed_vx_filename;
-	clustem6_vaxmed_vx_filename = s + "_clustem6_vaxmed_vx.txt";
-	std::ofstream clustem6_vaxmed_vx_file;
-	clustem6_vaxmed_vx_file.open(clustem6_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem6.size(); i++) {
-			clustem6_vaxmed_vx_file << vaccinations[vaxmedem6[i]][d] << "\t";
-			clustem6_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem6[i]][d] << "\t";
-		}
-		clustem6_vaxmed_vx_file << std::endl;
-		clustem6_vaxmed_file << std::endl;
-	}
-	std::string clustem6_vaxhigh_filename;
-	clustem6_vaxhigh_filename = s + "_clustem6_vaxhigh.txt";
-	std::ofstream clustem6_vaxhigh_file;
-	clustem6_vaxhigh_file.open(clustem6_vaxhigh_filename);
-	std::string clustem6_vaxhigh_vx_filename;
-	clustem6_vaxhigh_vx_filename = s + "_clustem6_vaxhigh_vx.txt";
-	std::ofstream clustem6_vaxhigh_vx_file;
-	clustem6_vaxhigh_vx_file.open(clustem6_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem6.size(); i++) {
-			clustem6_vaxhigh_vx_file << vaccinations[vaxhighem6[i]][d] << "\t";
-			clustem6_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem6[i]][d] << "\t";
-		}
-		clustem6_vaxhigh_vx_file << std::endl;
-		clustem6_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem7_vaxlow_filename;
-	clustem7_vaxlow_filename = s + "_clustem7_vaxlow.txt";
-	std::ofstream clustem7_vaxlow_file;
-	clustem7_vaxlow_file.open(clustem7_vaxlow_filename);
-	std::string clustem7_vaxlow_vx_filename;
-	clustem7_vaxlow_vx_filename = s + "_clustem7_vaxlow_vx.txt";
-	std::ofstream clustem7_vaxlow_vx_file;
-	clustem7_vaxlow_vx_file.open(clustem7_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem7.size(); i++) {
-			clustem7_vaxlow_vx_file << vaccinations[vaxlowem7[i]][d] << "\t";
-			clustem7_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem7[i]][d] << "\t";
-		}
-		clustem7_vaxlow_vx_file << std::endl;
-		clustem7_vaxlow_file << std::endl;
-	}
-	std::string clustem7_vaxmed_filename;
-	clustem7_vaxmed_filename = s + "_clustem7_vaxmed.txt";
-	std::ofstream clustem7_vaxmed_file;
-	clustem7_vaxmed_file.open(clustem7_vaxmed_filename);
-	std::string clustem7_vaxmed_vx_filename;
-	clustem7_vaxmed_vx_filename = s + "_clustem7_vaxmed_vx.txt";
-	std::ofstream clustem7_vaxmed_vx_file;
-	clustem7_vaxmed_vx_file.open(clustem7_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem7.size(); i++) {
-			clustem7_vaxmed_vx_file << vaccinations[vaxmedem7[i]][d] << "\t";
-			clustem7_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem7[i]][d] << "\t";
-		}
-		clustem7_vaxmed_vx_file << std::endl;
-		clustem7_vaxmed_file << std::endl;
-	}
-	std::string clustem7_vaxhigh_filename;
-	clustem7_vaxhigh_filename = s + "_clustem7_vaxhigh.txt";
-	std::ofstream clustem7_vaxhigh_file;
-	clustem7_vaxhigh_file.open(clustem7_vaxhigh_filename);
-	std::string clustem7_vaxhigh_vx_filename;
-	clustem7_vaxhigh_vx_filename = s + "_clustem7_vaxhigh_vx.txt";
-	std::ofstream clustem7_vaxhigh_vx_file;
-	clustem7_vaxhigh_vx_file.open(clustem7_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem7.size(); i++) {
-			clustem7_vaxhigh_vx_file << vaccinations[vaxhighem7[i]][d] << "\t";
-			clustem7_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem7[i]][d] << "\t";
-		}
-		clustem7_vaxhigh_vx_file << std::endl;
-		clustem7_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem8_vaxlow_filename;
-	clustem8_vaxlow_filename = s + "_clustem8_vaxlow.txt";
-	std::ofstream clustem8_vaxlow_file;
-	clustem8_vaxlow_file.open(clustem8_vaxlow_filename);
-	std::string clustem8_vaxlow_vx_filename;
-	clustem8_vaxlow_vx_filename = s + "_clustem8_vaxlow_vx.txt";
-	std::ofstream clustem8_vaxlow_vx_file;
-	clustem8_vaxlow_vx_file.open(clustem8_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem8.size(); i++) {
-			clustem8_vaxlow_vx_file << vaccinations[vaxlowem8[i]][d] << "\t";
-			clustem8_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem8[i]][d] << "\t";
-		}
-		clustem8_vaxlow_vx_file << std::endl;
-		clustem8_vaxlow_file << std::endl;
-	}
-	std::string clustem8_vaxmed_filename;
-	clustem8_vaxmed_filename = s + "_clustem8_vaxmed.txt";
-	std::ofstream clustem8_vaxmed_file;
-	clustem8_vaxmed_file.open(clustem8_vaxmed_filename);
-	std::string clustem8_vaxmed_vx_filename;
-	clustem8_vaxmed_vx_filename = s + "_clustem8_vaxmed_vx.txt";
-	std::ofstream clustem8_vaxmed_vx_file;
-	clustem8_vaxmed_vx_file.open(clustem8_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem8.size(); i++) {
-			clustem8_vaxmed_vx_file << vaccinations[vaxmedem8[i]][d] << "\t";
-			clustem8_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem8[i]][d] << "\t";
-		}
-		clustem8_vaxmed_vx_file << std::endl;
-		clustem8_vaxmed_file << std::endl;
-	}
-	std::string clustem8_vaxhigh_filename;
-	clustem8_vaxhigh_filename = s + "_clustem8_vaxhigh.txt";
-	std::ofstream clustem8_vaxhigh_file;
-	clustem8_vaxhigh_file.open(clustem8_vaxhigh_filename);
-	std::string clustem8_vaxhigh_vx_filename;
-	clustem8_vaxhigh_vx_filename = s + "_clustem8_vaxhigh_vx.txt";
-	std::ofstream clustem8_vaxhigh_vx_file;
-	clustem8_vaxhigh_vx_file.open(clustem8_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem8.size(); i++) {
-			clustem8_vaxhigh_vx_file << vaccinations[vaxhighem8[i]][d] << "\t";
-			clustem8_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem8[i]][d] << "\t";
-		}
-		clustem8_vaxhigh_vx_file << std::endl;
-		clustem8_vaxhigh_file << std::endl;
-	}
-
-
-	std::string clustem9_vaxlow_filename;
-	clustem9_vaxlow_filename = s + "_clustem9_vaxlow.txt";
-	std::ofstream clustem9_vaxlow_file;
-	clustem9_vaxlow_file.open(clustem9_vaxlow_filename);
-	std::string clustem9_vaxlow_vx_filename;
-	clustem9_vaxlow_vx_filename = s + "_clustem9_vaxlow_vx.txt";
-	std::ofstream clustem9_vaxlow_vx_file;
-	clustem9_vaxlow_vx_file.open(clustem9_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem9.size(); i++) {
-			clustem9_vaxlow_vx_file << vaccinations[vaxlowem9[i]][d] << "\t";
-			clustem9_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem9[i]][d] << "\t";
-		}
-		clustem9_vaxlow_vx_file << std::endl;
-		clustem9_vaxlow_file << std::endl;
-	}
-	std::string clustem9_vaxmed_filename;
-	clustem9_vaxmed_filename = s + "_clustem9_vaxmed.txt";
-	std::ofstream clustem9_vaxmed_file;
-	clustem9_vaxmed_file.open(clustem9_vaxmed_filename);
-	std::string clustem9_vaxmed_vx_filename;
-	clustem9_vaxmed_vx_filename = s + "_clustem9_vaxmed_vx.txt";
-	std::ofstream clustem9_vaxmed_vx_file;
-	clustem9_vaxmed_vx_file.open(clustem9_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem9.size(); i++) {
-			clustem9_vaxmed_vx_file << vaccinations[vaxmedem9[i]][d] << "\t";
-			clustem9_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem9[i]][d] << "\t";
-		}
-		clustem9_vaxmed_vx_file << std::endl;
-		clustem9_vaxmed_file << std::endl;
-	}
-	std::string clustem9_vaxhigh_filename;
-	clustem9_vaxhigh_filename = s + "_clustem9_vaxhigh.txt";
-	std::ofstream clustem9_vaxhigh_file;
-	clustem9_vaxhigh_file.open(clustem9_vaxhigh_filename);
-	std::string clustem9_vaxhigh_vx_filename;
-	clustem9_vaxhigh_vx_filename = s + "_clustem9_vaxhigh_vx.txt";
-	std::ofstream clustem9_vaxhigh_vx_file;
-	clustem9_vaxhigh_vx_file.open(clustem9_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem9.size(); i++) {
-			clustem9_vaxhigh_vx_file << vaccinations[vaxhighem9[i]][d] << "\t";
-			clustem9_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem9[i]][d] << "\t";
-		}
-		clustem9_vaxhigh_vx_file << std::endl;
-		clustem9_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem10_vaxlow_filename;
-	clustem10_vaxlow_filename = s + "_clustem10_vaxlow.txt";
-	std::ofstream clustem10_vaxlow_file;
-	clustem10_vaxlow_file.open(clustem10_vaxlow_filename);
-	std::string clustem10_vaxlow_vx_filename;
-	clustem10_vaxlow_vx_filename = s + "_clustem10_vaxlow_vx.txt";
-	std::ofstream clustem10_vaxlow_vx_file;
-	clustem10_vaxlow_vx_file.open(clustem10_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem10.size(); i++) {
-			clustem10_vaxlow_vx_file << vaccinations[vaxlowem10[i]][d] << "\t";
-			clustem10_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem10[i]][d] << "\t";
-		}
-		clustem10_vaxlow_vx_file << std::endl;
-		clustem10_vaxlow_file << std::endl;
-	}
-	std::string clustem10_vaxmed_filename;
-	clustem10_vaxmed_filename = s + "_clustem10_vaxmed.txt";
-	std::ofstream clustem10_vaxmed_file;
-	clustem10_vaxmed_file.open(clustem10_vaxmed_filename);
-	std::string clustem10_vaxmed_vx_filename;
-	clustem10_vaxmed_vx_filename = s + "_clustem10_vaxmed_vx.txt";
-	std::ofstream clustem10_vaxmed_vx_file;
-	clustem10_vaxmed_vx_file.open(clustem10_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem10.size(); i++) {
-			clustem10_vaxmed_vx_file << vaccinations[vaxmedem10[i]][d] << "\t";
-			clustem10_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem10[i]][d] << "\t";
-		}
-		clustem10_vaxmed_vx_file << std::endl;
-		clustem10_vaxmed_file << std::endl;
-	}
-	std::string clustem10_vaxhigh_filename;
-	clustem10_vaxhigh_filename = s + "_clustem10_vaxhigh.txt";
-	std::ofstream clustem10_vaxhigh_file;
-	clustem10_vaxhigh_file.open(clustem10_vaxhigh_filename);
-	std::string clustem10_vaxhigh_vx_filename;
-	clustem10_vaxhigh_vx_filename = s + "_clustem10_vaxhigh_vx.txt";
-	std::ofstream clustem10_vaxhigh_vx_file;
-	clustem10_vaxhigh_vx_file.open(clustem10_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem10.size(); i++) {
-			clustem10_vaxhigh_vx_file << vaccinations[vaxhighem10[i]][d] << "\t";
-			clustem10_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem10[i]][d] << "\t";
-		}
-		clustem10_vaxhigh_vx_file << std::endl;
-		clustem10_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem11_vaxlow_filename;
-	clustem11_vaxlow_filename = s + "_clustem11_vaxlow.txt";
-	std::ofstream clustem11_vaxlow_file;
-	clustem11_vaxlow_file.open(clustem11_vaxlow_filename);
-	std::string clustem11_vaxlow_vx_filename;
-	clustem11_vaxlow_vx_filename = s + "_clustem11_vaxlow_vx.txt";
-	std::ofstream clustem11_vaxlow_vx_file;
-	clustem11_vaxlow_vx_file.open(clustem11_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem11.size(); i++) {
-			clustem11_vaxlow_vx_file << vaccinations[vaxlowem11[i]][d] << "\t";
-			clustem11_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem11[i]][d] << "\t";
-		}
-		clustem11_vaxlow_vx_file << std::endl;
-		clustem11_vaxlow_file << std::endl;
-	}
-	std::string clustem11_vaxmed_filename;
-	clustem11_vaxmed_filename = s + "_clustem11_vaxmed.txt";
-	std::ofstream clustem11_vaxmed_file;
-	clustem11_vaxmed_file.open(clustem11_vaxmed_filename);
-	std::string clustem11_vaxmed_vx_filename;
-	clustem11_vaxmed_vx_filename = s + "_clustem11_vaxmed_vx.txt";
-	std::ofstream clustem11_vaxmed_vx_file;
-	clustem11_vaxmed_vx_file.open(clustem11_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem11.size(); i++) {
-			clustem11_vaxmed_vx_file << vaccinations[vaxmedem11[i]][d] << "\t";
-			clustem11_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem11[i]][d] << "\t";
-		}
-		clustem11_vaxmed_vx_file << std::endl;
-		clustem11_vaxmed_file << std::endl;
-	}
-	std::string clustem11_vaxhigh_filename;
-	clustem11_vaxhigh_filename = s + "_clustem11_vaxhigh.txt";
-	std::ofstream clustem11_vaxhigh_file;
-	clustem11_vaxhigh_file.open(clustem11_vaxhigh_filename);
-	std::string clustem11_vaxhigh_vx_filename;
-	clustem11_vaxhigh_vx_filename = s + "_clustem11_vaxhigh_vx.txt";
-	std::ofstream clustem11_vaxhigh_vx_file;
-	clustem11_vaxhigh_vx_file.open(clustem11_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem11.size(); i++) {
-			clustem11_vaxhigh_vx_file << vaccinations[vaxhighem11[i]][d] << "\t";
-			clustem11_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem11[i]][d] << "\t";
-		}
-		clustem11_vaxhigh_vx_file << std::endl;
-		clustem11_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem12_vaxlow_filename;
-	clustem12_vaxlow_filename = s + "_clustem12_vaxlow.txt";
-	std::ofstream clustem12_vaxlow_file;
-	clustem12_vaxlow_file.open(clustem12_vaxlow_filename);
-	std::string clustem12_vaxlow_vx_filename;
-	clustem12_vaxlow_vx_filename = s + "_clustem12_vaxlow_vx.txt";
-	std::ofstream clustem12_vaxlow_vx_file;
-	clustem12_vaxlow_vx_file.open(clustem12_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem12.size(); i++) {
-			clustem12_vaxlow_vx_file << vaccinations[vaxlowem12[i]][d] << "\t";
-			clustem12_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem12[i]][d] << "\t";
-		}
-		clustem12_vaxlow_vx_file << std::endl;
-		clustem12_vaxlow_file << std::endl;
-	}
-	std::string clustem12_vaxmed_filename;
-	clustem12_vaxmed_filename = s + "_clustem12_vaxmed.txt";
-	std::ofstream clustem12_vaxmed_file;
-	clustem12_vaxmed_file.open(clustem12_vaxmed_filename);
-	std::string clustem12_vaxmed_vx_filename;
-	clustem12_vaxmed_vx_filename = s + "_clustem12_vaxmed_vx.txt";
-	std::ofstream clustem12_vaxmed_vx_file;
-	clustem12_vaxmed_vx_file.open(clustem12_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem12.size(); i++) {
-			clustem12_vaxmed_vx_file << vaccinations[vaxmedem12[i]][d] << "\t";
-			clustem12_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem12[i]][d] << "\t";
-		}
-		clustem12_vaxmed_vx_file << std::endl;
-		clustem12_vaxmed_file << std::endl;
-	}
-	std::string clustem12_vaxhigh_filename;
-	clustem12_vaxhigh_filename = s + "_clustem12_vaxhigh.txt";
-	std::ofstream clustem12_vaxhigh_file;
-	clustem12_vaxhigh_file.open(clustem12_vaxhigh_filename);
-	std::string clustem12_vaxhigh_vx_filename;
-	clustem12_vaxhigh_vx_filename = s + "_clustem12_vaxhigh_vx.txt";
-	std::ofstream clustem12_vaxhigh_vx_file;
-	clustem12_vaxhigh_vx_file.open(clustem12_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem12.size(); i++) {
-			clustem12_vaxhigh_vx_file << vaccinations[vaxhighem12[i]][d] << "\t";
-			clustem12_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem12[i]][d] << "\t";
-		}
-		clustem12_vaxhigh_vx_file << std::endl;
-		clustem12_vaxhigh_file << std::endl;
-	}
-
-	std::string clustem13_vaxlow_filename;
-	clustem13_vaxlow_filename = s + "_clustem13_vaxlow.txt";
-	std::ofstream clustem13_vaxlow_file;
-	clustem13_vaxlow_file.open(clustem13_vaxlow_filename);
-	std::string clustem13_vaxlow_vx_filename;
-	clustem13_vaxlow_vx_filename = s + "_clustem13_vaxlow_vx.txt";
-	std::ofstream clustem13_vaxlow_vx_file;
-	clustem13_vaxlow_vx_file.open(clustem13_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem13.size(); i++) {
-			clustem13_vaxlow_vx_file << vaccinations[vaxlowem13[i]][d] << "\t";
-			clustem13_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem13[i]][d] << "\t";
-		}
-		clustem13_vaxlow_vx_file << std::endl;
-		clustem13_vaxlow_file << std::endl;
-	}
-	std::string clustem13_vaxmed_filename;
-	clustem13_vaxmed_filename = s + "_clustem13_vaxmed.txt";
-	std::ofstream clustem13_vaxmed_file;
-	clustem13_vaxmed_file.open(clustem13_vaxmed_filename);
-	std::string clustem13_vaxmed_vx_filename;
-	clustem13_vaxmed_vx_filename = s + "_clustem13_vaxmed_vx.txt";
-	std::ofstream clustem13_vaxmed_vx_file;
-	clustem13_vaxmed_vx_file.open(clustem13_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem13.size(); i++) {
-			clustem13_vaxmed_vx_file << vaccinations[vaxmedem13[i]][d] << "\t";
-			clustem13_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem13[i]][d] << "\t";
-		}
-		clustem13_vaxmed_vx_file << std::endl;
-		clustem13_vaxmed_file << std::endl;
-	}
-	std::string clustem13_vaxhigh_filename;
-	clustem13_vaxhigh_filename = s + "_clustem13_vaxhigh.txt";
-	std::ofstream clustem13_vaxhigh_file;
-	clustem13_vaxhigh_file.open(clustem13_vaxhigh_filename);
-	std::string clustem13_vaxhigh_vx_filename;
-	clustem13_vaxhigh_vx_filename = s + "_clustem13_vaxhigh_vx.txt";
-	std::ofstream clustem13_vaxhigh_vx_file;
-	clustem13_vaxhigh_vx_file.open(clustem13_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem13.size(); i++) {
-			clustem13_vaxhigh_vx_file << vaccinations[vaxhighem13[i]][d] << "\t";
-			clustem13_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem13[i]][d] << "\t";
-		}
-		clustem13_vaxhigh_vx_file << std::endl;
-		clustem13_vaxhigh_file << std::endl;
-	}
-
-
-
-	std::string clustem14_vaxlow_filename;
-	clustem14_vaxlow_filename = s + "_clustem14_vaxlow.txt";
-	std::ofstream clustem14_vaxlow_file;
-	clustem14_vaxlow_file.open(clustem14_vaxlow_filename);
-	std::string clustem14_vaxlow_vx_filename;
-	clustem14_vaxlow_vx_filename = s + "_clustem14_vaxlow_vx.txt";
-	std::ofstream clustem14_vaxlow_vx_file;
-	clustem14_vaxlow_vx_file.open(clustem14_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem14.size(); i++) {
-			clustem14_vaxlow_vx_file << vaccinations[vaxlowem14[i]][d] << "\t";
-			clustem14_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem14[i]][d] << "\t";
-		}
-		clustem14_vaxlow_vx_file << std::endl;
-		clustem14_vaxlow_file << std::endl;
-	}
-	std::string clustem14_vaxmed_filename;
-	clustem14_vaxmed_filename = s + "_clustem14_vaxmed.txt";
-	std::ofstream clustem14_vaxmed_file;
-	clustem14_vaxmed_file.open(clustem14_vaxmed_filename);
-	std::string clustem14_vaxmed_vx_filename;
-	clustem14_vaxmed_vx_filename = s + "_clustem14_vaxmed_vx.txt";
-	std::ofstream clustem14_vaxmed_vx_file;
-	clustem14_vaxmed_vx_file.open(clustem14_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem14.size(); i++) {
-			clustem14_vaxmed_vx_file << vaccinations[vaxmedem14[i]][d] << "\t";
-			clustem14_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem14[i]][d] << "\t";
-		}
-		clustem14_vaxmed_vx_file << std::endl;
-		clustem14_vaxmed_file << std::endl;
-	}
-	std::string clustem14_vaxhigh_filename;
-	clustem14_vaxhigh_filename = s + "_clustem14_vaxhigh.txt";
-	std::ofstream clustem14_vaxhigh_file;
-	clustem14_vaxhigh_file.open(clustem14_vaxhigh_filename);
-	std::string clustem14_vaxhigh_vx_filename;
-	clustem14_vaxhigh_vx_filename = s + "_clustem14_vaxhigh_vx.txt";
-	std::ofstream clustem14_vaxhigh_vx_file;
-	clustem14_vaxhigh_vx_file.open(clustem14_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem14.size(); i++) {
-			clustem14_vaxhigh_vx_file << vaccinations[vaxhighem14[i]][d] << "\t";
-			clustem14_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem14[i]][d] << "\t";
-		}
-		clustem14_vaxhigh_vx_file << std::endl;
-		clustem14_vaxhigh_file << std::endl;
-	}
-
-
-
-	std::string clustem15_vaxlow_filename;
-	clustem15_vaxlow_filename = s + "_clustem15_vaxlow.txt";
-	std::ofstream clustem15_vaxlow_file;
-	clustem15_vaxlow_file.open(clustem15_vaxlow_filename);
-	std::string clustem15_vaxlow_vx_filename;
-	clustem15_vaxlow_vx_filename = s + "_clustem15_vaxlow_vx.txt";
-	std::ofstream clustem15_vaxlow_vx_file;
-	clustem15_vaxlow_vx_file.open(clustem15_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem15.size(); i++) {
-			clustem15_vaxlow_vx_file << vaccinations[vaxlowem15[i]][d] << "\t";
-			clustem15_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem15[i]][d] << "\t";
-		}
-		clustem15_vaxlow_vx_file << std::endl;
-		clustem15_vaxlow_file << std::endl;
-	}
-	std::string clustem15_vaxmed_filename;
-	clustem15_vaxmed_filename = s + "_clustem15_vaxmed.txt";
-	std::ofstream clustem15_vaxmed_file;
-	clustem15_vaxmed_file.open(clustem15_vaxmed_filename);
-	std::string clustem15_vaxmed_vx_filename;
-	clustem15_vaxmed_vx_filename = s + "_clustem15_vaxmed_vx.txt";
-	std::ofstream clustem15_vaxmed_vx_file;
-	clustem15_vaxmed_vx_file.open(clustem15_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem15.size(); i++) {
-			clustem15_vaxmed_vx_file << vaccinations[vaxmedem15[i]][d] << "\t";
-			clustem15_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem15[i]][d] << "\t";
-		}
-		clustem15_vaxmed_vx_file << std::endl;
-		clustem15_vaxmed_file << std::endl;
-	}
-	std::string clustem15_vaxhigh_filename;
-	clustem15_vaxhigh_filename = s + "_clustem15_vaxhigh.txt";
-	std::ofstream clustem15_vaxhigh_file;
-	clustem15_vaxhigh_file.open(clustem15_vaxhigh_filename);
-	std::string clustem15_vaxhigh_vx_filename;
-	clustem15_vaxhigh_vx_filename = s + "_clustem15_vaxhigh_vx.txt";
-	std::ofstream clustem15_vaxhigh_vx_file;
-	clustem15_vaxhigh_vx_file.open(clustem15_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem15.size(); i++) {
-			clustem15_vaxhigh_vx_file << vaccinations[vaxhighem15[i]][d] << "\t";
-			clustem15_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem15[i]][d] << "\t";
-		}
-		clustem15_vaxhigh_vx_file << std::endl;
-		clustem15_vaxhigh_file << std::endl;
-	}
-
-
-
-	std::string clustem16_vaxlow_filename;
-	clustem16_vaxlow_filename = s + "_clustem16_vaxlow.txt";
-	std::ofstream clustem16_vaxlow_file;
-	clustem16_vaxlow_file.open(clustem16_vaxlow_filename);
-	std::string clustem16_vaxlow_vx_filename;
-	clustem16_vaxlow_vx_filename = s + "_clustem16_vaxlow_vx.txt";
-	std::ofstream clustem16_vaxlow_vx_file;
-	clustem16_vaxlow_vx_file.open(clustem16_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem16.size(); i++) {
-			clustem16_vaxlow_vx_file << vaccinations[vaxlowem16[i]][d] << "\t";
-			clustem16_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem16[i]][d] << "\t";
-		}
-		clustem16_vaxlow_vx_file << std::endl;
-		clustem16_vaxlow_file << std::endl;
-	}
-	std::string clustem16_vaxmed_filename;
-	clustem16_vaxmed_filename = s + "_clustem16_vaxmed.txt";
-	std::ofstream clustem16_vaxmed_file;
-	clustem16_vaxmed_file.open(clustem16_vaxmed_filename);
-	std::string clustem16_vaxmed_vx_filename;
-	clustem16_vaxmed_vx_filename = s + "_clustem16_vaxmed_vx.txt";
-	std::ofstream clustem16_vaxmed_vx_file;
-	clustem16_vaxmed_vx_file.open(clustem16_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem16.size(); i++) {
-			clustem16_vaxmed_vx_file << vaccinations[vaxmedem16[i]][d] << "\t";
-			clustem16_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem16[i]][d] << "\t";
-		}
-		clustem16_vaxmed_vx_file << std::endl;
-		clustem16_vaxmed_file << std::endl;
-	}
-	std::string clustem16_vaxhigh_filename;
-	clustem16_vaxhigh_filename = s + "_clustem16_vaxhigh.txt";
-	std::ofstream clustem16_vaxhigh_file;
-	clustem16_vaxhigh_file.open(clustem16_vaxhigh_filename);
-	std::string clustem16_vaxhigh_vx_filename;
-	clustem16_vaxhigh_vx_filename = s + "_clustem16_vaxhigh_vx.txt";
-	std::ofstream clustem16_vaxhigh_vx_file;
-	clustem16_vaxhigh_vx_file.open(clustem16_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem16.size(); i++) {
-			clustem16_vaxhigh_vx_file << vaccinations[vaxhighem16[i]][d] << "\t";
-			clustem16_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem16[i]][d] << "\t";
-		}
-		clustem16_vaxhigh_vx_file << std::endl;
-		clustem16_vaxhigh_file << std::endl;
-	}
-
-
-
-
-	std::string clustem17_vaxlow_filename;
-	clustem17_vaxlow_filename = s + "_clustem17_vaxlow.txt";
-	std::ofstream clustem17_vaxlow_file;
-	clustem17_vaxlow_file.open(clustem17_vaxlow_filename);
-	std::string clustem17_vaxlow_vx_filename;
-	clustem17_vaxlow_vx_filename = s + "_clustem17_vaxlow_vx.txt";
-	std::ofstream clustem17_vaxlow_vx_file;
-	clustem17_vaxlow_vx_file.open(clustem17_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem17.size(); i++) {
-			clustem17_vaxlow_vx_file << vaccinations[vaxlowem17[i]][d] << "\t";
-			clustem17_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem17[i]][d] << "\t";
-		}
-		clustem17_vaxlow_vx_file << std::endl;
-		clustem17_vaxlow_file << std::endl;
-	}
-	std::string clustem17_vaxmed_filename;
-	clustem17_vaxmed_filename = s + "_clustem17_vaxmed.txt";
-	std::ofstream clustem17_vaxmed_file;
-	clustem17_vaxmed_file.open(clustem17_vaxmed_filename);
-	std::string clustem17_vaxmed_vx_filename;
-	clustem17_vaxmed_vx_filename = s + "_clustem17_vaxmed_vx.txt";
-	std::ofstream clustem17_vaxmed_vx_file;
-	clustem17_vaxmed_vx_file.open(clustem17_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem17.size(); i++) {
-			clustem17_vaxmed_vx_file << vaccinations[vaxmedem17[i]][d] << "\t";
-			clustem17_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem17[i]][d] << "\t";
-		}
-		clustem17_vaxmed_vx_file << std::endl;
-		clustem17_vaxmed_file << std::endl;
-	}
-	std::string clustem17_vaxhigh_filename;
-	clustem17_vaxhigh_filename = s + "_clustem17_vaxhigh.txt";
-	std::ofstream clustem17_vaxhigh_file;
-	clustem17_vaxhigh_file.open(clustem17_vaxhigh_filename);
-	std::string clustem17_vaxhigh_vx_filename;
-	clustem17_vaxhigh_vx_filename = s + "_clustem17_vaxhigh_vx.txt";
-	std::ofstream clustem17_vaxhigh_vx_file;
-	clustem17_vaxhigh_vx_file.open(clustem17_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem17.size(); i++) {
-			clustem17_vaxhigh_vx_file << vaccinations[vaxhighem17[i]][d] << "\t";
-			clustem17_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem17[i]][d] << "\t";
-		}
-		clustem17_vaxhigh_vx_file << std::endl;
-		clustem17_vaxhigh_file << std::endl;
-	}
-
-
-
-	std::string clustem18_vaxlow_filename;
-	clustem18_vaxlow_filename = s + "_clustem18_vaxlow.txt";
-	std::ofstream clustem18_vaxlow_file;
-	clustem18_vaxlow_file.open(clustem18_vaxlow_filename);
-	std::string clustem18_vaxlow_vx_filename;
-	clustem18_vaxlow_vx_filename = s + "_clustem18_vaxlow_vx.txt";
-	std::ofstream clustem18_vaxlow_vx_file;
-	clustem18_vaxlow_vx_file.open(clustem18_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem18.size(); i++) {
-			clustem18_vaxlow_vx_file << vaccinations[vaxlowem18[i]][d] << "\t";
-			clustem18_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem18[i]][d] << "\t";
-		}
-		clustem18_vaxlow_vx_file << std::endl;
-		clustem18_vaxlow_file << std::endl;
-	}
-	std::string clustem18_vaxmed_filename;
-	clustem18_vaxmed_filename = s + "_clustem18_vaxmed.txt";
-	std::ofstream clustem18_vaxmed_file;
-	clustem18_vaxmed_file.open(clustem18_vaxmed_filename);
-	std::string clustem18_vaxmed_vx_filename;
-	clustem18_vaxmed_vx_filename = s + "_clustem18_vaxmed_vx.txt";
-	std::ofstream clustem18_vaxmed_vx_file;
-	clustem18_vaxmed_vx_file.open(clustem18_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem18.size(); i++) {
-			clustem18_vaxmed_vx_file << vaccinations[vaxmedem18[i]][d] << "\t";
-			clustem18_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem18[i]][d] << "\t";
-		}
-		clustem18_vaxmed_vx_file << std::endl;
-		clustem18_vaxmed_file << std::endl;
-	}
-	std::string clustem18_vaxhigh_filename;
-	clustem18_vaxhigh_filename = s + "_clustem18_vaxhigh.txt";
-	std::ofstream clustem18_vaxhigh_file;
-	clustem18_vaxhigh_file.open(clustem18_vaxhigh_filename);
-	std::string clustem18_vaxhigh_vx_filename;
-	clustem18_vaxhigh_vx_filename = s + "_clustem18_vaxhigh_vx.txt";
-	std::ofstream clustem18_vaxhigh_vx_file;
-	clustem18_vaxhigh_vx_file.open(clustem18_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem18.size(); i++) {
-			clustem18_vaxhigh_vx_file << vaccinations[vaxhighem18[i]][d] << "\t";
-			clustem18_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem18[i]][d] << "\t";
-		}
-		clustem18_vaxhigh_vx_file << std::endl;
-		clustem18_vaxhigh_file << std::endl;
-	}
-
-
-	std::string clustem19_vaxlow_filename;
-	clustem19_vaxlow_filename = s + "_clustem19_vaxlow.txt";
-	std::ofstream clustem19_vaxlow_file;
-	clustem19_vaxlow_file.open(clustem19_vaxlow_filename);
-	std::string clustem19_vaxlow_vx_filename;
-	clustem19_vaxlow_vx_filename = s + "_clustem19_vaxlow_vx.txt";
-	std::ofstream clustem19_vaxlow_vx_file;
-	clustem19_vaxlow_vx_file.open(clustem19_vaxlow_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxlowem19.size(); i++) {
-			clustem19_vaxlow_vx_file << vaccinations[vaxlowem19[i]][d] << "\t";
-			clustem19_vaxlow_file << excessmortalitypscoreinterpolated[vaxlowem19[i]][d] << "\t";
-		}
-		clustem19_vaxlow_vx_file << std::endl;
-		clustem19_vaxlow_file << std::endl;
-	}
-	std::string clustem19_vaxmed_filename;
-	clustem19_vaxmed_filename = s + "_clustem19_vaxmed.txt";
-	std::ofstream clustem19_vaxmed_file;
-	clustem19_vaxmed_file.open(clustem19_vaxmed_filename);
-	std::string clustem19_vaxmed_vx_filename;
-	clustem19_vaxmed_vx_filename = s + "_clustem19_vaxmed_vx.txt";
-	std::ofstream clustem19_vaxmed_vx_file;
-	clustem19_vaxmed_vx_file.open(clustem19_vaxmed_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxmedem19.size(); i++) {
-			clustem19_vaxmed_vx_file << vaccinations[vaxmedem19[i]][d] << "\t";
-			clustem19_vaxmed_file << excessmortalitypscoreinterpolated[vaxmedem19[i]][d] << "\t";
-		}
-		clustem19_vaxmed_vx_file << std::endl;
-		clustem19_vaxmed_file << std::endl;
-	}
-	std::string clustem19_vaxhigh_filename;
-	clustem19_vaxhigh_filename = s + "_clustem19_vaxhigh.txt";
-	std::ofstream clustem19_vaxhigh_file;
-	clustem19_vaxhigh_file.open(clustem19_vaxhigh_filename);
-	std::string clustem19_vaxhigh_vx_filename;
-	clustem19_vaxhigh_vx_filename = s + "_clustem19_vaxhigh_vx.txt";
-	std::ofstream clustem19_vaxhigh_vx_file;
-	clustem19_vaxhigh_vx_file.open(clustem19_vaxhigh_vx_filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		for (unsigned int i = 0; i < vaxhighem19.size(); i++) {
-			clustem19_vaxhigh_vx_file << vaccinations[vaxhighem19[i]][d] << "\t";
-			clustem19_vaxhigh_file << excessmortalitypscoreinterpolated[vaxhighem19[i]][d] << "\t";
-		}
-		clustem19_vaxhigh_vx_file << std::endl;
-		clustem19_vaxhigh_file << std::endl;
-	}
-
-
-	return 0;
-
+// Write one cluster/tertile pair at a time. Large matrices are read by reference.
+int doclustering(int c, const std::vector<int>& clustcd,
+                 const std::vector<int>& clustem,
+                 const std::vector<std::vector<double>>& vaccinations,
+                 const std::vector<double>& /*cumvax*/,
+                 const std::vector<std::vector<double>>& coviddeaths,
+                 const std::vector<std::vector<double>>& excessmortalitypscoreinterpolated) {
+    const std::vector<int>* tertiles[] = {&vaxlow, &vaxmed, &vaxhigh};
+    const char* tertile_names[] = {"low", "med", "high"};
+    const std::vector<int>* labels[] = {&clustcd, &clustem};
+    const char* measures[] = {"cd", "em"};
+    const std::vector<std::vector<double>>* outcomes[] = {
+        &coviddeaths, &excessmortalitypscoreinterpolated};
+    std::vector<int> country_order;
+    std::vector<int> country_tertile;
+    for (int country = 0; country < numentities; ++country) {
+        for (int group = 0; group < 3; ++group) {
+            if (std::find(tertiles[group]->begin(), tertiles[group]->end(), country)
+                    != tertiles[group]->end()) {
+                country_order.push_back(country);
+                country_tertile.push_back(group);
+                break;
+            }
+        }
+    }
+    if (clustcd.size() != country_order.size() || clustem.size() != country_order.size())
+        throw std::runtime_error("Cluster labels do not match the country order.");
+    for (int measure = 0; measure < 2; ++measure) {
+        for (int cluster = 0; cluster < 20; ++cluster) {
+            for (int group = 0; group < 3; ++group) {
+                const std::string stem = std::to_string(c) + "_clust" + measures[measure]
+                    + std::to_string(cluster) + "_vax" + tertile_names[group];
+                std::ofstream outcome_file(stem + ".txt");
+                std::ofstream vaccine_file(stem + "_vx.txt");
+                if (!outcome_file || !vaccine_file)
+                    throw std::runtime_error("Could not open cluster output: " + stem);
+                std::vector<int> members;
+                for (std::size_t row = 0; row < country_order.size(); ++row)
+                    if (country_tertile[row] == group && (*labels[measure])[row] == cluster)
+                        members.push_back(country_order[row]);
+                for (int day = 0; day < numdates; ++day) {
+                    for (int country : members) {
+                        vaccine_file << vaccinations[country][day] << "\t";
+                        outcome_file << (*outcomes[measure])[country][day] << "\t";
+                    }
+                    outcome_file << '\n';
+                    vaccine_file << '\n';
+                }
+                outcome_file.close();
+                vaccine_file.close();
+                if (!outcome_file || !vaccine_file)
+                    throw std::runtime_error("Could not finish cluster output: " + stem);
+            }
+        }
+    }
+    return 0;
 }
 
+// Stream objects live on the heap; references stay valid as the pool grows.
+// The pool closes them on normal return and during exception unwinding.
+class FileStreams {
+    std::vector<std::unique_ptr<std::ifstream>> inputs_;
+    std::vector<std::unique_ptr<std::ofstream>> outputs_;
+public:
+    std::ifstream& input() {
+        inputs_.push_back(std::make_unique<std::ifstream>());
+        return *inputs_.back();
+    }
+    std::ofstream& output() {
+        outputs_.push_back(std::make_unique<std::ofstream>());
+        return *outputs_.back();
+    }
+};
 
+void write_country_pair(const std::string& filename,
+                        const boost::gregorian::date& firstdate,
+                        const std::vector<double>& first1,
+                        const std::vector<double>& first2,
+                        const std::vector<double>& second1,
+                        const std::vector<double>& second2) {
+    if (first1.size() != first2.size() || first1.size() != second1.size()
+            || first1.size() != second2.size())
+        throw std::runtime_error("Mismatched country-pair lengths: " + filename);
+    std::ofstream output(filename);
+    if (!output) throw std::runtime_error("Could not open " + filename);
+    for (std::size_t day = 0; day < first1.size(); ++day) {
+        const auto d = firstdate + boost::gregorian::date_duration(static_cast<long>(day));
+        output << std::setfill('0') << std::setw(2) << d.day() << "/"
+               << std::setw(2) << d.month().as_number() << "/" << d.year()
+               << "\t" << first1[day] << "\t" << first2[day]
+               << "\t" << second1[day] << "\t" << second2[day] << '\n';
+    }
+    output.close();
+    if (!output) throw std::runtime_error("Could not finish " + filename);
+    std::cout << ".";
+}
 
-
-
-int main()
+int main(int argc, char* argv[]) try
 {
-	int numprevaxdates = 342;
+    FileStreams streams;
+    bool prepare_only = false, use_clusters = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--prepare-only") prepare_only = true;
+        else if (arg == "--use-clusters") use_clusters = true;
+        else throw std::runtime_error("Unknown option: " + arg);
+    }
+
+	int numprevaxdates; // Calculated from 8 December 2020, not an assumed first date.
 
 	auto start = std::chrono::high_resolution_clock::now();
 
 	using namespace boost::gregorian;
 
 	std::string outputfilename;
-	outputfilename = "output.txt";
-	std::ofstream outputfile;
+	outputfilename = "owid_output.txt";
+	auto& outputfile = streams.output();
 	outputfile.open(outputfilename);
+	if (!outputfile) throw std::runtime_error("Could not open " + std::string(outputfilename));
+
+    const auto require_header = [](const std::string& path,
+            const std::vector<std::pair<std::size_t, std::string>>& expected) {
+        std::ifstream input(path);
+        if (!input) throw std::runtime_error("Could not open " + path);
+        std::string line;
+        if (!std::getline(input, line)) throw std::runtime_error("Empty input: " + path);
+        std::vector<std::string> columns;
+        columns = csv_fields(line);
+        for (const auto& col : expected)
+            if (col.first >= columns.size() || boost::trim_copy(columns[col.first]) != col.second)
+                throw std::runtime_error("Unexpected CSV header in " + path);
+        if (!std::getline(input, line) || line.empty())
+            throw std::runtime_error("No data rows in " + path);
+    };
+    require_header("owid-covid-data.csv", {{0,"iso_code"},{3,"date"},
+        {13,"total_deaths_per_million"},{15,"new_deaths_smoothed_per_million"},
+        {44,"new_vaccinations_smoothed_per_million"},{47,"stringency_index"}});
+    require_header("face-covering-policies-covid.csv", {{0,"Entity"},{1,"Code"},{2,"Day"}});
+    require_header("covid-vaccination-doses-per-capita.csv", {{3,"total_vaccinations_per_hundred"}});
+    require_header("daily-covid-vaccination-doses-per-capita.csv", {{0,"Entity"},{1,"Code"},{2,"Day"}});
+    require_header("excess-mortality-p-scores-average-baseline-by-age.csv", {{8,"p_avg_all_ages"}});
+    outputfile << "Units: daily vaccinations = doses per 100 people per day; COVID-19 death rate = deaths per million people per day; excess mortality = P-score (% above/below the expected baseline).\n";
+    outputfile << "Country-group curves are unweighted means over available countries; reporting coverage may vary by date.\nGroups use tertiles of positive reported cumulative doses per 100 people, cumulative deaths per million people, or cumulative policy index-point days. Zero/unknown totals are excluded, not assumed to be bad data.\n";
+    outputfile << "P-score summaries below are unweighted means of reported weekly/monthly periods, not aggregate annual excess-death percentages.\n";
+    outputfile << "The post-vaccination summary uses the common date 8 December 2020, not each country's rollout date.\n\n";
 
 	std::string token;
 
@@ -2656,8 +374,9 @@ int main()
 	// AFG,Asia,Afghanistan,2020-01-03,...
 	std::string coviddeathsfilename;
 	coviddeathsfilename = "owid-covid-data.csv";
-	std::ifstream coviddeathsfile;
+	auto& coviddeathsfile = streams.input();
 	coviddeathsfile.open(coviddeathsfilename);
+	if (!coviddeathsfile) throw std::runtime_error("Could not open " + std::string(coviddeathsfilename));
 	if (coviddeathsfile.fail()) {
 		std::cout << "Failed to open " << coviddeathsfilename << std::endl;
 		std::cout << "Press Enter";
@@ -2667,35 +386,35 @@ int main()
 	while (!coviddeathsfile.eof()) {
 		getline(coviddeathsfile, str); // first row is header, so ignore
 		getline(coviddeathsfile, str); // get first row of data
-		boost::split(fields, str, boost::is_any_of(","));
-		code.push_back(fields[0]); // add first country
-		continent.push_back(fields[1]);
-		entity.push_back(fields[2]);
-		if (fields[1] != "")
+		fields = csv_fields(str);
+		code.push_back(fields.at(0)); // add first country
+		continent.push_back(fields.at(1));
+		entity.push_back(fields.at(2));
+		if (fields.at(1) != "")
 			numcountries++;
 
-		previouscountry = fields[2];
-		firstdate = from_simple_string(fields[3]);
-		lastdate = from_simple_string(fields[3]);
+		previouscountry = fields.at(2);
+		firstdate = from_simple_string(fields.at(3));
+		lastdate = from_simple_string(fields.at(3));
 		while (getline(coviddeathsfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					if (!fields[0].empty() && (std::find(code.begin(), code.end(), fields[0]) == code.end())) { // if country not in list, add to list
-						code.push_back(fields[0]);
-						continent.push_back(fields[1]);
-						entity.push_back(fields[2]);
-						if (fields[1] != "")
+					fields = csv_fields(str);
+					if (!fields.at(0).empty() && (std::find(code.begin(), code.end(), fields.at(0)) == code.end())) { // if country not in list, add to list
+						code.push_back(fields.at(0));
+						continent.push_back(fields.at(1));
+						entity.push_back(fields.at(2));
+						if (fields.at(1) != "")
 							numcountries++;
 					}
-					newdate = from_simple_string(fields[3]);
+					newdate = from_simple_string(fields.at(3));
 					if (newdate < firstdate)
 						firstdate = newdate;
 					if (newdate > lastdate)
 						lastdate = newdate;
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -2708,6 +427,10 @@ int main()
 	numentities = entity.size();
 	days daterange = lastdate - firstdate;
 	numdates = daterange.days() + 1;
+    numprevaxdates = (date(2020, 12, 8) - firstdate).days();
+    if (numprevaxdates <= 0 || numprevaxdates > numdates)
+        throw std::runtime_error("The input does not cover the pre-vaccination period ending 7 December 2020.");
+
 	outputfile << "First date: " << firstdate << std::endl;
 	outputfile << "Last date: " << lastdate << std::endl;
 	outputfile << "Number of dates: " << numdates << std::endl;
@@ -2723,8 +446,9 @@ int main()
 	std::string dp, mp;
 	std::string datesfilename;
 	datesfilename = "dates.txt";
-	std::ofstream datesfile;
+	auto& datesfile = streams.output();
 	datesfile.open(datesfilename);
+	if (!datesfile) throw std::runtime_error("Could not open " + std::string(datesfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		date_duration dd(d);
 		date d2 = firstdate + dd;
@@ -2742,8 +466,9 @@ int main()
 	std::cout << ".";
 
 
-	std::vector<std::vector<double>> coviddeaths(numentities, std::vector<double>(numdates, nan("")));
-	std::vector<std::vector<double>> vaccinations(numentities, std::vector<double>(numdates, nan("")));
+	std::vector<std::vector<double>> coviddeaths(numentities, std::vector<double>(numdates, std::nan("")));
+	std::vector<std::vector<double>> vaccinations(numentities, std::vector<double>(numdates, std::nan("")));
+    std::vector<std::vector<double>> vaccination_reference(numentities, std::vector<double>(numdates, std::nan("")));
 
 		
 
@@ -2762,25 +487,27 @@ int main()
 	///////////////
 	std::string lockdownfilename;
 	lockdownfilename = "owid-covid-data.csv";
-	std::ifstream lockdownfile;
-	std::vector<std::vector<double>> lockdown(numentities, std::vector<double>(numdates, nan("")));
+	auto& lockdownfile = streams.input();
+	std::vector<std::vector<double>> lockdown(numentities, std::vector<double>(numdates, std::nan("")));
 
 	lockdownfile.open(lockdownfilename);
+
+	if (!lockdownfile) throw std::runtime_error("Could not open " + std::string(lockdownfilename));
 	while (!lockdownfile.eof()) {
 		getline(lockdownfile, str); // first row is header, so ignore
 		while (getline(lockdownfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[3]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(3));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[0].empty() && !fields[47].empty() && (dateint < numdates)) {
-						lockdown[CountryIndex(code, fields[0])][dateint] = stod(fields[47]);
+					if (!fields.at(0).empty() && !fields.at(47).empty() && (dateint >= 0 && dateint < numdates)) {
+						lockdown[CountryIndex(code, fields.at(0))][dateint] = std::stod(fields.at(47));
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -2794,32 +521,17 @@ int main()
 	//////////////////////////
 
 
-	std::vector<double> cumlockdowns(numentities);
-	// Afghanistan,AFG,2020-01-21,0
-	while (!lockdownfile.eof()) {
-		getline(lockdownfile, str); // first row is header, so ignore
-		getline(lockdownfile, str); // get first row of data
-		boost::split(fields, str, boost::is_any_of(","));
-		if (!fields[0].empty() && !fields[47].empty()) {
-			cumlockdowns[CountryIndex(code, fields[0])] = cumlockdowns[CountryIndex(code, fields[0])] + stod(fields[47]);
-		}
-		while (getline(lockdownfile, str)) {
-			if (!str.empty()) {
-				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					if (!fields[0].empty() && !fields[47].empty()) {
-						cumlockdowns[CountryIndex(code, fields[0])] = cumlockdowns[CountryIndex(code, fields[0])] + stod(fields[47]);
-					}
-				}
-				catch (const std::exception& e) {
-					std::cout << e.what();
-				}
-			}
-		}
-	}
-	lockdownfile.clear();
-	lockdownfile.seekg(0);
-	std::cout << ".";
+    std::vector<double> cumlockdowns(numentities, std::nan(""));
+    for (int ci = 0; ci < numentities; ++ci) {
+        double sum = 0.0;
+        bool observed = false;
+        for (double value : lockdown[ci]) if (std::isfinite(value)) {
+            sum += value;
+            observed = true;
+        }
+        if (observed) cumlockdowns[ci] = sum;
+    }
+    std::cout << ".";
 
 
 
@@ -2829,27 +541,28 @@ int main()
 	///////////
 	// MASKS //
 	///////////
-	std::vector<std::vector<double>> masks(numentities, std::vector<double>(numdates, nan("")));
+	std::vector<std::vector<double>> masks(numentities, std::vector<double>(numdates, std::nan("")));
 
 	std::string masksfilename;
 	masksfilename = "face-covering-policies-covid.csv";
-	std::ifstream masksfile;
+	auto& masksfile = streams.input();
 	masksfile.open(masksfilename);
+	if (!masksfile) throw std::runtime_error("Could not open " + std::string(masksfilename));
 	while (!masksfile.eof()) {
 		getline(masksfile, str); // first row is header, so ignore
 		while (getline(masksfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[2]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(2));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[1].empty() && !fields[3].empty() && (dateint < numdates)) {
-						masks[CountryIndex(code, fields[1])][dateint] = stod(fields[3]);
+					if (!fields.at(1).empty() && std::find(code.begin(), code.end(), fields.at(1)) != code.end() && !fields.at(3).empty() && dateint >= 0 && dateint < numdates) {
+						masks[CountryIndex(code, fields.at(1))][dateint] = std::stod(fields.at(3));
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -2862,32 +575,17 @@ int main()
 	// CUMULATIVE MASKS //
 	//////////////////////
 
-	std::vector<double> cummasks(numentities);
-	// Afghanistan,AFG,2020-01-01,0
-	while (!masksfile.eof()) {
-		getline(masksfile, str); // first row is header, so ignore
-		getline(masksfile, str); // get first row of data
-		boost::split(fields, str, boost::is_any_of(","));
-		if (!fields[1].empty() && !fields[3].empty()) {
-			cummasks[CountryIndex(code, fields[1])] = cummasks[CountryIndex(code, fields[1])] + stod(fields[3]);
-		}
-		while (getline(masksfile, str)) {
-			if (!str.empty()) {
-				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					if (!fields[1].empty() && !fields[3].empty()) {
-						cummasks[CountryIndex(code, fields[1])] = cummasks[CountryIndex(code, fields[1])] + stod(fields[3]);
-					}
-				}
-				catch (const std::exception& e) {
-					std::cout << e.what();
-				}
-			}
-		}
-	}
-	masksfile.clear();
-	masksfile.seekg(0);
-	std::cout << ".";
+    std::vector<double> cummasks(numentities, std::nan(""));
+    for (int ci = 0; ci < numentities; ++ci) {
+        double sum = 0.0;
+        bool observed = false;
+        for (double value : masks[ci]) if (std::isfinite(value)) {
+            sum += value;
+            observed = true;
+        }
+        if (observed) cummasks[ci] = sum;
+    }
+    std::cout << ".";
 
 
 
@@ -2899,7 +597,8 @@ int main()
 	// COVID DEATHS //
 	//////////////////
 
-	std::vector<double> cumcoviddeaths(numentities);
+	std::vector<double> cumcoviddeaths(numentities, std::nan(""));
+    std::vector<int> latest_covid_death_date(numentities, -1);
 	// COVID-19 deaths
 	// AFG,Asia,Afghanistan,2020-01-03,,0.0,,,0.0
 	while (!coviddeathsfile.eof()) {
@@ -2907,17 +606,25 @@ int main()
 		while (getline(coviddeathsfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[3]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(3));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[0].empty() && !fields[15].empty() && (dateint < numdates)) {
-						coviddeaths[CountryIndex(code, fields[0])][dateint] = stod(fields[15]);
-						cumcoviddeaths[CountryIndex(code, fields[0])] = cumcoviddeaths[CountryIndex(code, fields[0])] + stod(fields[15]);
+                    if (dateint >= 0 && dateint < numdates && !fields.at(0).empty()) {
+                        const int ci = CountryIndex(code, fields.at(0));
+                        if (!fields.at(13).empty() && dateint >= latest_covid_death_date[ci]) {
+                            cumcoviddeaths[ci] = std::stod(fields.at(13));
+                            latest_covid_death_date[ci] = dateint;
+                        }
+                        if (!fields.at(44).empty()) vaccination_reference[ci][dateint] = std::stod(fields.at(44));
+                    }
+					if (!fields.at(0).empty() && !fields.at(15).empty() && (dateint >= 0 && dateint < numdates)) {
+						coviddeaths[CountryIndex(code, fields.at(0))][dateint] = std::stod(fields.at(15));
+						// Cumulative deaths come from the reported cumulative field below, not a sum of smoothed rates.
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -2935,11 +642,12 @@ int main()
 	for (unsigned int i = 0; i < numentities; i++)
 		if (cumcoviddeaths[i] > 0 && !continent[i].empty()) // ignore all zero values and non countries
 			tempcoviddeaths.push_back(cumcoviddeaths[i]);
+	if (tempcoviddeaths.size() < 3) throw std::runtime_error("Too few eligible countries for tertiles: tempcoviddeaths");
 	std::sort(tempcoviddeaths.begin(), tempcoviddeaths.end());
-	tcd1 = tempcoviddeaths[round((tempcoviddeaths.size() / 3) - 1)];
-	tcd2 = tempcoviddeaths[round((2 * tempcoviddeaths.size() / 3) - 1)];
+	tcd1 = tempcoviddeaths[std::round((tempcoviddeaths.size() / 3) - 1)];
+	tcd2 = tempcoviddeaths[std::round((2 * tempcoviddeaths.size() / 3) - 1)];
 	for (unsigned int i = 0; i < numentities; i++)
-		if (cumcoviddeaths[i] != 0) {
+		if (cumcoviddeaths[i] > 0 && !continent[i].empty()) { // ignore non-countries (aggregates) in death groups
 			if (cumcoviddeaths[i] <= tcd1)
 				coviddeathslow.push_back(i);
 			else if (cumcoviddeaths[i] <= tcd2)
@@ -2948,7 +656,7 @@ int main()
 				coviddeathshigh.push_back(i);
 		}
 
-	outputfile << "Countries with a low COVID-19 death rate" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million" << std::endl;
 	outputfile << "Country\tTotal COVID-19 deaths per million" << std::endl;
 	for (unsigned int i = 0; i < coviddeathslow.size(); i++)
 		display.push_back(entity[coviddeathslow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslow[i]]));
@@ -2958,7 +666,7 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with a medium COVID-19 death rate" << std::endl;
+	outputfile << "Countries with medium cumulative COVID-19 deaths per million" << std::endl;
 	outputfile << "Country\tTotal COVID-19 deaths per million" << std::endl;
 	for (unsigned int i = 0; i < coviddeathsmed.size(); i++)
 		display.push_back(entity[coviddeathsmed[i]] + "\t" + tostring(cumcoviddeaths[coviddeathsmed[i]]));
@@ -2968,7 +676,7 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with a high COVID-19 death rateh" << std::endl;
+	outputfile << "Countries with high cumulative COVID-19 deaths per million" << std::endl;
 	outputfile << "Country\tTotal COVID-19 deaths per million" << std::endl;
 	for (unsigned int i = 0; i < coviddeathshigh.size(); i++)
 		display.push_back(entity[coviddeathshigh[i]] + "\t" + tostring(cumcoviddeaths[coviddeathshigh[i]]));
@@ -3014,88 +722,89 @@ int main()
 	//   0       1    2        3           4            5            6           7           8
 	// Albania,ALB,2020-01-31,,,,,,-10.65
 
-	std::vector<std::vector<double>> excessmortalitypscore(numentities, std::vector<double>(numdates, nan("")));
+	std::vector<std::vector<double>> excessmortalitypscore(numentities, std::vector<double>(numdates, std::nan("")));
 
-	std::vector<double> HRVexcessmortalitypscore_0_14(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_15_64(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_65_74(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_75_84(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_85p(numdates, nan(""));
+	std::vector<double> HRVexcessmortalitypscore_0_14(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_15_64(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_65_74(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_75_84(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_85p(numdates, std::nan(""));
 
-	std::vector<double> HUNexcessmortalitypscore_0_14(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_15_64(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_65_74(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_75_84(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_85p(numdates, nan(""));
+	std::vector<double> HUNexcessmortalitypscore_0_14(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_15_64(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_65_74(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_75_84(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_85p(numdates, std::nan(""));
 
-	std::vector<double> HRVexcessmortalitypscore_0_14interpolated(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_15_64interpolated(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_65_74interpolated(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_75_84interpolated(numdates, nan(""));
-	std::vector<double> HRVexcessmortalitypscore_85pinterpolated(numdates, nan(""));
+	std::vector<double> HRVexcessmortalitypscore_0_14interpolated(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_15_64interpolated(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_65_74interpolated(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_75_84interpolated(numdates, std::nan(""));
+	std::vector<double> HRVexcessmortalitypscore_85pinterpolated(numdates, std::nan(""));
 
-	std::vector<double> HUNexcessmortalitypscore_0_14interpolated(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_15_64interpolated(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_65_74interpolated(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_75_84interpolated(numdates, nan(""));
-	std::vector<double> HUNexcessmortalitypscore_85pinterpolated(numdates, nan(""));
+	std::vector<double> HUNexcessmortalitypscore_0_14interpolated(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_15_64interpolated(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_65_74interpolated(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_75_84interpolated(numdates, std::nan(""));
+	std::vector<double> HUNexcessmortalitypscore_85pinterpolated(numdates, std::nan(""));
 
     // Entity,Code,Day,p_avg_0_14,p_avg_15_64,p_avg_65_74,p_avg_75_84,p_avg_85p,p_avg_all_ages
     // Croatia,HRV,2020-01-05,14.29,-7.84,-3.74,-28.37,-8.06,-14.47
 	std::string excessmortalitypscorefilename;
 	excessmortalitypscorefilename = "excess-mortality-p-scores-average-baseline-by-age.csv";
-	std::ifstream excessmortalitypscorefile;
+	auto& excessmortalitypscorefile = streams.input();
 	excessmortalitypscorefile.open(excessmortalitypscorefilename);
+	if (!excessmortalitypscorefile) throw std::runtime_error("Could not open " + std::string(excessmortalitypscorefilename));
 	while (!excessmortalitypscorefile.eof()) {
 		getline(excessmortalitypscorefile, str); // first row is header, so ignore
 		getline(excessmortalitypscorefile, str); // get first row of data
-		boost::split(fields, str, boost::is_any_of(","));
-		d = from_simple_string(fields[2]);
+		fields = csv_fields(str);
+		d = from_simple_string(fields.at(2));
 		dd = d - firstdate;
 		dateint = dd.days();
-		if (!fields[1].empty() && !fields[8].empty() && (dateint < numdates)) {
-			excessmortalitypscore[CountryIndex(code, fields[1])][dateint] = stod(fields[8]);
+		if (!fields.at(1).empty() && std::find(code.begin(), code.end(), fields.at(1)) != code.end() && !fields.at(8).empty() && dateint >= 0 && dateint < numdates) {
+			excessmortalitypscore[CountryIndex(code, fields.at(1))][dateint] = std::stod(fields.at(8));
 
-			if (fields[1] == "HRV") {
-				HRVexcessmortalitypscore_0_14[dateint] = stod(fields[3]);
-				HRVexcessmortalitypscore_15_64[dateint] = stod(fields[4]);
-				HRVexcessmortalitypscore_65_74[dateint] = stod(fields[5]);
-				HRVexcessmortalitypscore_75_84[dateint] = stod(fields[6]);
-				HRVexcessmortalitypscore_85p[dateint] = stod(fields[7]);
+			if (fields.at(1) == "HRV") {
+				HRVexcessmortalitypscore_0_14[dateint] = (fields.at(3).empty() ? std::nan("") : std::stod(fields.at(3)));
+				HRVexcessmortalitypscore_15_64[dateint] = (fields.at(4).empty() ? std::nan("") : std::stod(fields.at(4)));
+				HRVexcessmortalitypscore_65_74[dateint] = (fields.at(5).empty() ? std::nan("") : std::stod(fields.at(5)));
+				HRVexcessmortalitypscore_75_84[dateint] = (fields.at(6).empty() ? std::nan("") : std::stod(fields.at(6)));
+				HRVexcessmortalitypscore_85p[dateint] = (fields.at(7).empty() ? std::nan("") : std::stod(fields.at(7)));
 			}
 
 
-			if (fields[1] == "HUN") {
-				HUNexcessmortalitypscore_0_14[dateint] = stod(fields[3]);
-				HUNexcessmortalitypscore_15_64[dateint] = stod(fields[4]);
-				HUNexcessmortalitypscore_65_74[dateint] = stod(fields[5]);
-				HUNexcessmortalitypscore_75_84[dateint] = stod(fields[6]);
-				HUNexcessmortalitypscore_85p[dateint] = stod(fields[7]);
+			if (fields.at(1) == "HUN") {
+				HUNexcessmortalitypscore_0_14[dateint] = (fields.at(3).empty() ? std::nan("") : std::stod(fields.at(3)));
+				HUNexcessmortalitypscore_15_64[dateint] = (fields.at(4).empty() ? std::nan("") : std::stod(fields.at(4)));
+				HUNexcessmortalitypscore_65_74[dateint] = (fields.at(5).empty() ? std::nan("") : std::stod(fields.at(5)));
+				HUNexcessmortalitypscore_75_84[dateint] = (fields.at(6).empty() ? std::nan("") : std::stod(fields.at(6)));
+				HUNexcessmortalitypscore_85p[dateint] = (fields.at(7).empty() ? std::nan("") : std::stod(fields.at(7)));
 			}
 
-			cumexcess[CountryIndex(code, fields[1])] = cumexcess[CountryIndex(code, fields[1])] + stod(fields[8]);
+			cumexcess[CountryIndex(code, fields.at(1))] = cumexcess[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-			if (dateint >= 342)
-				cumexcesspostvax[CountryIndex(code, fields[1])] = cumexcesspostvax[CountryIndex(code, fields[1])] + stod(fields[8]);
+			if (d >= date(2020, 12, 8))
+				cumexcesspostvax[CountryIndex(code, fields.at(1))] = cumexcesspostvax[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-			if (dateint >= 366 && dateint <= 730)
-				cumexcess2021[CountryIndex(code, fields[1])] = cumexcess2021[CountryIndex(code, fields[1])] + stod(fields[8]);
+			if (d.year() == 2021)
+				cumexcess2021[CountryIndex(code, fields.at(1))] = cumexcess2021[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-			if (dateint >= 731 && dateint <= 1095)
-				cumexcess2022[CountryIndex(code, fields[1])] = cumexcess2022[CountryIndex(code, fields[1])] + stod(fields[8]);
+			if (d.year() == 2022)
+				cumexcess2022[CountryIndex(code, fields.at(1))] = cumexcess2022[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-			if (dateint >= 1096)
-				cumexcess2023[CountryIndex(code, fields[1])] = cumexcess2023[CountryIndex(code, fields[1])] + stod(fields[8]);
+			if (d.year() == 2023)
+				cumexcess2023[CountryIndex(code, fields.at(1))] = cumexcess2023[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-			sumem[CountryIndex(code, fields[1])]++;
-			if (dateint >= 342)
-				sumempostvax[CountryIndex(code, fields[1])]++;
-			if (dateint >= 366 && dateint <= 730)
-				sumem2021[CountryIndex(code, fields[1])]++;
-			if (dateint >= 731 && dateint <= 1095)
-				sumem2022[CountryIndex(code, fields[1])]++;
-			if (dateint >= 1096)
-				sumem2023[CountryIndex(code, fields[1])]++;
+			sumem[CountryIndex(code, fields.at(1))]++;
+			if (d >= date(2020, 12, 8))
+				sumempostvax[CountryIndex(code, fields.at(1))]++;
+			if (d.year() == 2021)
+				sumem2021[CountryIndex(code, fields.at(1))]++;
+			if (d.year() == 2022)
+				sumem2022[CountryIndex(code, fields.at(1))]++;
+			if (d.year() == 2023)
+				sumem2023[CountryIndex(code, fields.at(1))]++;
 		}
 
 
@@ -3104,82 +813,82 @@ int main()
 		while (getline(excessmortalitypscorefile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[2]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(2));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[1].empty() && !fields[8].empty() && !(std::find(code.begin(), code.end(), fields[1]) == code.end()) && (dateint < numdates)) {
-						excessmortalitypscore[CountryIndex(code, fields[1])][dateint] = stod(fields[8]);
+					if (!fields.at(1).empty() && !fields.at(8).empty() && !(std::find(code.begin(), code.end(), fields.at(1)) == code.end()) && (dateint >= 0 && dateint < numdates)) {
+						excessmortalitypscore[CountryIndex(code, fields.at(1))][dateint] = std::stod(fields.at(8));
 
-						if (fields[1] == "HRV") {
-							HRVexcessmortalitypscore_0_14[dateint] = stod(fields[3]);
-							HRVexcessmortalitypscore_15_64[dateint] = stod(fields[4]);
-							HRVexcessmortalitypscore_65_74[dateint] = stod(fields[5]);
-							HRVexcessmortalitypscore_75_84[dateint] = stod(fields[6]);
-							HRVexcessmortalitypscore_85p[dateint] = stod(fields[7]);
+						if (fields.at(1) == "HRV") {
+							HRVexcessmortalitypscore_0_14[dateint] = (fields.at(3).empty() ? std::nan("") : std::stod(fields.at(3)));
+							HRVexcessmortalitypscore_15_64[dateint] = (fields.at(4).empty() ? std::nan("") : std::stod(fields.at(4)));
+							HRVexcessmortalitypscore_65_74[dateint] = (fields.at(5).empty() ? std::nan("") : std::stod(fields.at(5)));
+							HRVexcessmortalitypscore_75_84[dateint] = (fields.at(6).empty() ? std::nan("") : std::stod(fields.at(6)));
+							HRVexcessmortalitypscore_85p[dateint] = (fields.at(7).empty() ? std::nan("") : std::stod(fields.at(7)));
 						}
 
-						if (fields[1] == "HUN") {
-							HUNexcessmortalitypscore_0_14[dateint] = stod(fields[3]);
-							HUNexcessmortalitypscore_15_64[dateint] = stod(fields[4]);
-							HUNexcessmortalitypscore_65_74[dateint] = stod(fields[5]);
-							HUNexcessmortalitypscore_75_84[dateint] = stod(fields[6]);
-							HUNexcessmortalitypscore_85p[dateint] = stod(fields[7]);
+						if (fields.at(1) == "HUN") {
+							HUNexcessmortalitypscore_0_14[dateint] = (fields.at(3).empty() ? std::nan("") : std::stod(fields.at(3)));
+							HUNexcessmortalitypscore_15_64[dateint] = (fields.at(4).empty() ? std::nan("") : std::stod(fields.at(4)));
+							HUNexcessmortalitypscore_65_74[dateint] = (fields.at(5).empty() ? std::nan("") : std::stod(fields.at(5)));
+							HUNexcessmortalitypscore_75_84[dateint] = (fields.at(6).empty() ? std::nan("") : std::stod(fields.at(6)));
+							HUNexcessmortalitypscore_85p[dateint] = (fields.at(7).empty() ? std::nan("") : std::stod(fields.at(7)));
 						}
 
-						cumexcess[CountryIndex(code, fields[1])] = cumexcess[CountryIndex(code, fields[1])] + stod(fields[8]);
+						cumexcess[CountryIndex(code, fields.at(1))] = cumexcess[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-						if (dateint >= 342)
-							cumexcesspostvax[CountryIndex(code, fields[1])] = cumexcesspostvax[CountryIndex(code, fields[1])] + stod(fields[8]);
+						if (d >= date(2020, 12, 8))
+							cumexcesspostvax[CountryIndex(code, fields.at(1))] = cumexcesspostvax[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-						if (dateint >= 366 && dateint <= 730)
-							cumexcess2021[CountryIndex(code, fields[1])] = cumexcess2021[CountryIndex(code, fields[1])] + stod(fields[8]);
+						if (d.year() == 2021)
+							cumexcess2021[CountryIndex(code, fields.at(1))] = cumexcess2021[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-						if (dateint >= 731 && dateint <= 1095)
-							cumexcess2022[CountryIndex(code, fields[1])] = cumexcess2022[CountryIndex(code, fields[1])] + stod(fields[8]);
+						if (d.year() == 2022)
+							cumexcess2022[CountryIndex(code, fields.at(1))] = cumexcess2022[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-						if (dateint >= 1096)
-							cumexcess2023[CountryIndex(code, fields[1])] = cumexcess2023[CountryIndex(code, fields[1])] + stod(fields[8]);
+						if (d.year() == 2023)
+							cumexcess2023[CountryIndex(code, fields.at(1))] = cumexcess2023[CountryIndex(code, fields.at(1))] + std::stod(fields.at(8));
 
-						sumem[CountryIndex(code, fields[1])]++;
-						if (dateint >= 342)
-							sumempostvax[CountryIndex(code, fields[1])]++;
-						if (dateint >= 366 && dateint <= 730)
-							sumem2021[CountryIndex(code, fields[1])]++;
-						if (dateint >= 731 && dateint <= 1095)
-							sumem2022[CountryIndex(code, fields[1])]++;
-						if (dateint >= 1096)
-							sumem2023[CountryIndex(code, fields[1])]++;
+						sumem[CountryIndex(code, fields.at(1))]++;
+						if (d >= date(2020, 12, 8))
+							sumempostvax[CountryIndex(code, fields.at(1))]++;
+						if (d.year() == 2021)
+							sumem2021[CountryIndex(code, fields.at(1))]++;
+						if (d.year() == 2022)
+							sumem2022[CountryIndex(code, fields.at(1))]++;
+						if (d.year() == 2023)
+							sumem2023[CountryIndex(code, fields.at(1))]++;
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
 	}
 	std::cout << ".";
 	for (int i = 0; i < cumexcess.size(); i++)
-		meanexcess[i] = cumexcess[i] / sumem[i];
+		meanexcess[i] = sumem[i] ? cumexcess[i] / sumem[i] : std::nan("");
 
 	for (int i = 0; i < cumexcesspostvax.size(); i++)
-		meanexcesspostvax[i] = cumexcesspostvax[i] / sumempostvax[i];
+		meanexcesspostvax[i] = sumempostvax[i] ? cumexcesspostvax[i] / sumempostvax[i] : std::nan("");
 
 	for (int i = 0; i < cumexcess2021.size(); i++)
-		meanexcess2021[i] = cumexcess2021[i] / sumem2021[i];
+		meanexcess2021[i] = sumem2021[i] ? cumexcess2021[i] / sumem2021[i] : std::nan("");
 
 	for (int i = 0; i < cumexcess2022.size(); i++)
-		meanexcess2022[i] = cumexcess2022[i] / sumem2022[i];
+		meanexcess2022[i] = sumem2022[i] ? cumexcess2022[i] / sumem2022[i] : std::nan("");
 
 	for (int i = 0; i < cumexcess2023.size(); i++)
-		meanexcess2023[i] = cumexcess2023[i] / sumem2023[i];
+		meanexcess2023[i] = sumem2023[i] ? cumexcess2023[i] / sumem2023[i] : std::nan("");
 
 	excessmortalitypscorefile.clear();
 	excessmortalitypscorefile.seekg(0);
 
 
 
-	std::vector<std::vector<double>> excessmortalitypscoreinterpolated(numentities, std::vector<double>(numdates, nan("")));
+	std::vector<std::vector<double>> excessmortalitypscoreinterpolated(numentities, std::vector<double>(numdates, std::nan("")));
 
 
 
@@ -3188,7 +897,7 @@ int main()
 	std::vector<double> y;
 	for (unsigned int c = 0; c < excessmortalitypscore.size(); c++) {
 		for (unsigned int d = 0; d < excessmortalitypscore[c].size(); d++) {
-			if (!isnan(excessmortalitypscore[c][d])) {
+			if (!std::isnan(excessmortalitypscore[c][d])) {
 				x.push_back(double(d));
 				y.push_back(excessmortalitypscore[c][d]);
 			}
@@ -3197,14 +906,14 @@ int main()
 		int last = -1;
 		bool firstcase = true;
 		for (unsigned int d = 0; d < excessmortalitypscoreinterpolated[c].size(); d++)
-			if (!isnan(excessmortalitypscore[c][d])) {
+			if (!std::isnan(excessmortalitypscore[c][d])) {
 				if (firstcase == true) {
 					first = d;
 					firstcase = false;
 				}
 				last = d;
 			}
-		if (x.size() > 0) {
+		if (x.size() > 1) {
 			boost::math::interpolators::barycentric_rational<double> interpolant(x.data(), y.data(), x.size(), 0); // approximation order, default is 3, but 0 looks best
 			//boost::math::interpolators::cardinal_cubic_b_spline<double> spline(y.begin(), y.end(), first, 1);
 			for (unsigned int d = 0; d < excessmortalitypscoreinterpolated[c].size(); d++) {
@@ -3218,6 +927,17 @@ int main()
 		y.clear();
 	}
 	
+    // Fit pre-vaccination histories using only observations before 8 December 2020.
+    // Barycentric interpolation is global: slicing the full-history interpolant
+    // would allow later mortality observations to influence clustering and DTW.
+    std::vector<std::vector<double>> excessmortalitypscoreprevax;
+    excessmortalitypscoreprevax.reserve(numentities);
+    for (const auto& observations : excessmortalitypscore) {
+        std::vector<double> before_vaccination(observations.begin(),
+                                             observations.begin() + numprevaxdates);
+        excessmortalitypscoreprevax.push_back(Interpolate(std::move(before_vaccination)));
+    }
+
 	HRVexcessmortalitypscore_0_14interpolated = Interpolate(HRVexcessmortalitypscore_0_14);
     HRVexcessmortalitypscore_15_64interpolated = Interpolate(HRVexcessmortalitypscore_15_64);
     HRVexcessmortalitypscore_65_74interpolated = Interpolate(HRVexcessmortalitypscore_65_74);
@@ -3235,13 +955,15 @@ int main()
 
 	std::string coviddeathslowcdfilename;
 	coviddeathslowcdfilename = "coviddeathslowcd.txt";
-	std::ofstream coviddeathslowcdfile;
+	auto& coviddeathslowcdfile = streams.output();
 	coviddeathslowcdfile.open(coviddeathslowcdfilename);
+	if (!coviddeathslowcdfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowcdfilename));
 
 	std::string coviddeathslowemfilename;
 	coviddeathslowemfilename = "coviddeathslowem.txt";
-	std::ofstream coviddeathslowemfile;
+	auto& coviddeathslowemfile = streams.output();
 	coviddeathslowemfile.open(coviddeathslowemfilename);
+	if (!coviddeathslowemfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslow.size(); i++) {
 			coviddeathslowcdfile << coviddeaths[coviddeathslow[i]][d] << "\t";
@@ -3252,12 +974,14 @@ int main()
 	}
 	std::string coviddeathsmedcdfilename;
 	coviddeathsmedcdfilename = "coviddeathsmedcd.txt";
-	std::ofstream coviddeathsmedcdfile;
+	auto& coviddeathsmedcdfile = streams.output();
 	coviddeathsmedcdfile.open(coviddeathsmedcdfilename);
+	if (!coviddeathsmedcdfile) throw std::runtime_error("Could not open " + std::string(coviddeathsmedcdfilename));
 	std::string coviddeathsmedemfilename;
 	coviddeathsmedemfilename = "coviddeathsmedem.txt";
-	std::ofstream coviddeathsmedemfile;
+	auto& coviddeathsmedemfile = streams.output();
 	coviddeathsmedemfile.open(coviddeathsmedemfilename);
+	if (!coviddeathsmedemfile) throw std::runtime_error("Could not open " + std::string(coviddeathsmedemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathsmed.size(); i++) {
 			coviddeathsmedcdfile << coviddeaths[coviddeathsmed[i]][d] << "\t";
@@ -3268,12 +992,14 @@ int main()
 	}
 	std::string coviddeathshighcdfilename;
 	coviddeathshighcdfilename = "coviddeathshighcd.txt";
-	std::ofstream coviddeathshighcdfile;
+	auto& coviddeathshighcdfile = streams.output();
 	coviddeathshighcdfile.open(coviddeathshighcdfilename);
+	if (!coviddeathshighcdfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighcdfilename));
 	std::string coviddeathshighemfilename;
 	coviddeathshighemfilename = "coviddeathshighem.txt";
-	std::ofstream coviddeathshighemfile;
+	auto& coviddeathshighemfile = streams.output();
 	coviddeathshighemfile.open(coviddeathshighemfilename);
+	if (!coviddeathshighemfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathshigh.size(); i++) {
 			coviddeathshighcdfile << coviddeaths[coviddeathshigh[i]][d] << "\t";
@@ -3290,47 +1016,58 @@ int main()
 
 	// CUMULATIVE VACCINATIONS
 	// Generate a list of countries by total cumulative number of vaccinations
-	std::vector<double> cumvax(numentities);
-	std::vector<double> cumvax2020(numentities);
-	std::vector<double> cumvax20202021(numentities);
-	std::vector<double> cumvax20202022(numentities);
+	std::vector<double> cumvax(numentities, std::nan(""));
+	std::vector<double> cumvax2020(numentities, std::nan(""));
+	std::vector<double> cumvax20202021(numentities, std::nan(""));
+	std::vector<double> cumvax20202022(numentities, std::nan(""));
+    std::vector<int> latest_vax(numentities, std::numeric_limits<int>::min());
+    std::vector<int> latest_vax2020 = latest_vax, latest_vax2021 = latest_vax, latest_vax2022 = latest_vax;
+    const auto update_latest = [](std::vector<double>& totals, std::vector<int>& latest,
+                                  int ci, int date_index, double value) {
+        if (date_index >= latest[ci]) { totals[ci] = value; latest[ci] = date_index; }
+    };
 	// covid-vaccination-doses-per-capita.csv
 	// Afghanistan,AFG,2021-02-22,0
 	std::string cumvaxfilename;
 	cumvaxfilename = "covid-vaccination-doses-per-capita.csv";
-	std::ifstream cumvaxfile;
+	auto& cumvaxfile = streams.input();
 	cumvaxfile.open(cumvaxfilename);
+	if (!cumvaxfile) throw std::runtime_error("Could not open " + std::string(cumvaxfilename));
 	while (!cumvaxfile.eof()) {
 		getline(cumvaxfile, str); // first row is header, so ignore
 		getline(cumvaxfile, str); // get first row of data
-		boost::split(fields, str, boost::is_any_of(","));
-		d = from_simple_string(fields[2]);
+		fields = csv_fields(str);
+		d = from_simple_string(fields.at(2));
 		dd = d - firstdate;
 		dateint = dd.days();
-		if (!fields[1].empty() && !fields[3].empty()) {
-			cumvax[CountryIndex(code, fields[1])] = stod(fields[3]);
-			if (dateint <= 730)
-				cumvax20202021[CountryIndex(code, fields[1])] = stod(fields[3]);
-			if (dateint <= 1095)
-				cumvax20202022[CountryIndex(code, fields[1])] = stod(fields[3]);
+		if (!fields.at(1).empty() && std::find(code.begin(), code.end(), fields.at(1)) != code.end() && !fields.at(3).empty()) {
+			update_latest(cumvax, latest_vax, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+                        if (d <= date(2020, 12, 31))
+                            update_latest(cumvax2020, latest_vax2020, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+			if (d <= date(2021, 12, 31))
+				update_latest(cumvax20202021, latest_vax2021, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+			if (d <= date(2022, 12, 31))
+				update_latest(cumvax20202022, latest_vax2022, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
 		}
 		while (getline(cumvaxfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[2]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(2));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[1].empty() && !fields[3].empty()) {
-						cumvax[CountryIndex(code, fields[1])] = stod(fields[3]);
-						if (dateint <= 730)
-							cumvax20202021[CountryIndex(code, fields[1])] = stod(fields[3]);
-						if (dateint <= 1095)
-							cumvax20202022[CountryIndex(code, fields[1])] = stod(fields[3]);
+					if (!fields.at(1).empty() && std::find(code.begin(), code.end(), fields.at(1)) != code.end() && !fields.at(3).empty()) {
+						update_latest(cumvax, latest_vax, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+                        if (d <= date(2020, 12, 31))
+                            update_latest(cumvax2020, latest_vax2020, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+						if (d <= date(2021, 12, 31))
+							update_latest(cumvax20202021, latest_vax2021, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
+						if (d <= date(2022, 12, 31))
+							update_latest(cumvax20202022, latest_vax2022, CountryIndex(code, fields.at(1)), dateint, std::stod(fields.at(3)));
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -3351,9 +1088,9 @@ int main()
 	// p_avg_0_14,p_avg_15_64,p_avg_65_74,p_avg_75_84,p_avg_85p
 
 	std::string excessstring;
-	outputfile << "Continent" << "\t" << "Entity" << "\t" << "Code" << "\t" << "Cumulative lockdown stringency index" << "\t" << "Cumulative face covering policies index" << "\t" << "Total vaccinations per hundred" << "\t" << "Total COVID-19 deaths per million" << "\t" << "Mean excess mortality P-scores" << std::endl;
+	outputfile << "Continent" << "\t" << "Entity" << "\t" << "Code" << "\t" << "Cumulative lockdown stringency (index-point days)" << "\t" << "Cumulative face-covering policy (index-point days)" << "\t" << "Total vaccine doses per 100 people" << "\t" << "Total COVID-19 deaths per million" << "\t" << "Mean excess mortality P-scores (%)" << std::endl;
 	for (unsigned int i = 0; i < numentities; i++) {
-		if (!isnan(meanexcess[i]))
+		if (!std::isnan(meanexcess[i]))
 			excessstring = tostring(meanexcess[i]);
 		else
 			excessstring = "nan";
@@ -3370,30 +1107,30 @@ int main()
 	std::string excess2021string;
 	std::string excess2022string;
 	std::string excess2023string;
-	outputfile << "Continent" << "\t" << "Entity" << "\t" << "Code" << "\t" << "Vaccinations per hundred in 2020" << "\t" << "Vaccinations per hundred in 2021" << "\t" << "Vaccinations per hundred in 2022" << "\t" << "Total vaccinations per hundred" << "\t" << "Mean post vaccination excess mortality P-scores" << "\t" << "Mean 2021 excess mortality P-scores" << "\t" << "Mean 2022 excess mortality P-scores" << "\t" << "Mean 2023 excess mortality P-scores" << "\t" << "Mean excess mortality P-scores" << std::endl;
+	outputfile << "Continent" << "\t" << "Entity" << "\t" << "Code" << "\t" << "Cumulative vaccine doses per 100 people, latest reported by 31 December 2020" << "\t" << "Cumulative vaccine doses per 100 people, latest reported by 31 December 2021" << "\t" << "Cumulative vaccine doses per 100 people, latest reported by 31 December 2022" << "\t" << "Total vaccine doses per 100 people" << "\t" << "Mean post vaccination excess mortality P-scores (%)" << "\t" << "Mean 2021 excess mortality P-scores (%)" << "\t" << "Mean 2022 excess mortality P-scores (%)" << "\t" << "Mean 2023 excess mortality P-scores (%)" << "\t" << "Mean excess mortality P-scores (%)" << std::endl;
 	for (unsigned int i = 0; i < numentities; i++) {
 
-		if (!isnan(meanexcesspostvax[i]))
+		if (!std::isnan(meanexcesspostvax[i]))
 			excesspostvaxstring = tostring(meanexcesspostvax[i]);
 		else
 			excesspostvaxstring = "nan";
 
-		if (!isnan(meanexcess2021[i]))
+		if (!std::isnan(meanexcess2021[i]))
 			excess2021string = tostring(meanexcess2021[i]);
 		else
 			excess2021string = "nan";
 
-		if (!isnan(meanexcess2022[i]))
+		if (!std::isnan(meanexcess2022[i]))
 			excess2022string = tostring(meanexcess2022[i]);
 		else
 			excess2022string = "nan";
 
-		if (!isnan(meanexcess2023[i]))
+		if (!std::isnan(meanexcess2023[i]))
 			excess2023string = tostring(meanexcess2023[i]);
 		else
 			excess2023string = "nan";
 
-		if (!isnan(meanexcess[i]))
+		if (!std::isnan(meanexcess[i]))
 			excessstring = tostring(meanexcess[i]);
 		else
 			excessstring = "nan";
@@ -3420,10 +1157,12 @@ int main()
 	//////////////////
 
 
+	int matches_per_hundred = 0, matches_per_million = 0;
 	std::string vaxfilename;
 	vaxfilename = "daily-covid-vaccination-doses-per-capita.csv";
-	std::ifstream vaxfile;
+	auto& vaxfile = streams.input();
 	vaxfile.open(vaxfilename);
+	if (!vaxfile) throw std::runtime_error("Could not open " + std::string(vaxfilename));
 
 	// Afghanistan,AFG,2021-02-22,0
 	while (!vaxfile.eof()) {
@@ -3431,16 +1170,24 @@ int main()
 		while (getline(vaxfile, str)) {
 			if (!str.empty()) {
 				try {
-					boost::split(fields, str, boost::is_any_of(","));
-					d = from_simple_string(fields[2]);
+					fields = csv_fields(str);
+					d = from_simple_string(fields.at(2));
 					dd = d - firstdate;
 					dateint = dd.days();
-					if (!fields[1].empty() && !fields[3].empty() && (dateint < numdates)) {
-						vaccinations[CountryIndex(code, fields[1])][dateint] = stod(fields[3]);
+					if (!fields.at(1).empty() && std::find(code.begin(), code.end(), fields.at(1)) != code.end() && !fields.at(3).empty() && dateint >= 0 && dateint < numdates) {
+						vaccinations[CountryIndex(code, fields.at(1))][dateint] = std::stod(fields.at(3));
+                        const double ref = vaccination_reference[CountryIndex(code, fields.at(1))][dateint];
+                        const double val = std::stod(fields.at(3));
+                        if (std::isfinite(ref) && ref > 0 && val > 0) {
+                            const double ratio = ref / val;
+                            if (std::abs(ratio / 10000.0 - 1.0) < 1e-6) ++matches_per_hundred;
+                            else if (std::abs(ratio - 1.0) < 1e-6) ++matches_per_million;
+                            else throw std::runtime_error("Daily vaccination scale disagrees with OWID reference.");
+                        }
 					}
 				}
 				catch (const std::exception& e) {
-					std::cout << e.what();
+					throw std::runtime_error(std::string("Invalid input row: ") + e.what());
 				}
 			}
 		}
@@ -3453,20 +1200,30 @@ int main()
 
 
 
-	std::vector<double> tempvax;
+	    if ((matches_per_hundred == 0 && matches_per_million == 0) ||
+            (matches_per_hundred > 0 && matches_per_million > 0))
+        throw std::runtime_error("Cannot establish a consistent daily vaccination unit.");
+    if (matches_per_million > 0)
+        for (auto& row : vaccinations) for (auto& value : row) value /= 10000.0;
+    outputfile << "Daily vaccination input verified against "
+               << matches_per_hundred + matches_per_million
+               << " positive OWID matches; output unit: doses per 100 people per day.\n\n";
+
+std::vector<double> tempvax;
 
 	outputfile << "Countries for clustering:" << std::endl;
 	for (unsigned int i = 0; i < numentities; i++)
-		if (cumvax[i] > 0 && !continent[i].empty()) { // ignore all zero vax (bad data) and non-countries
+		if (cumvax[i] > 0 && !continent[i].empty()) { // Eligibility rule: positive reported cumulative doses and a known continent.
 			outputfile << entity[i] << '\t';
 			tempvax.push_back(cumvax[i]);
 		}
 	outputfile << std::endl;
 	outputfile << std::endl;
 
+	if (tempvax.size() < 3) throw std::runtime_error("Too few eligible countries for tertiles: tempvax");
 	std::sort(tempvax.begin(), tempvax.end());
-	tv1 = tempvax[round((tempvax.size() / 3) - 1)];
-	tv2 = tempvax[round((2 * tempvax.size() / 3) - 1)];
+	tv1 = tempvax[std::round((tempvax.size() / 3) - 1)];
+	tv2 = tempvax[std::round((2 * tempvax.size() / 3) - 1)];
 
 
 
@@ -3489,8 +1246,8 @@ int main()
 
 
 
-	outputfile << "Countries with a low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < vaxlow.size(); i++)
 		display.push_back(entity[vaxlow[i]] + "\t" + tostring(cumvax[vaxlow[i]]));
 	std::sort(display.begin(), display.end());
@@ -3500,8 +1257,8 @@ int main()
 	display.clear();
 
 
-	outputfile << "Countries with a medium Vaccination rate" << std::endl;
-	outputfile << "Country\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < vaxmed.size(); i++)
 		display.push_back(entity[vaxmed[i]] + "\t" + tostring(cumvax[vaxmed[i]]));
 	std::sort(display.begin(), display.end());
@@ -3510,8 +1267,8 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with a high vaccination rate" << std::endl;
-	outputfile << "Country\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < vaxhigh.size(); i++)
 		display.push_back(entity[vaxhigh[i]] + "\t" + tostring(cumvax[vaxhigh[i]]));
 	std::sort(display.begin(), display.end());
@@ -3524,18 +1281,21 @@ int main()
 
 	std::string vaxlowvxfilename;
 	vaxlowvxfilename = "vaxlowvx.txt";
-	std::ofstream vaxlowvxfile;
+	auto& vaxlowvxfile = streams.output();
 	vaxlowvxfile.open(vaxlowvxfilename);
+	if (!vaxlowvxfile) throw std::runtime_error("Could not open " + std::string(vaxlowvxfilename));
 
 	std::string vaxlowcdfilename;
 	vaxlowcdfilename = "vaxlowcd.txt";
-	std::ofstream vaxlowcdfile;
+	auto& vaxlowcdfile = streams.output();
 	vaxlowcdfile.open(vaxlowcdfilename);
+	if (!vaxlowcdfile) throw std::runtime_error("Could not open " + std::string(vaxlowcdfilename));
 
 	std::string vaxlowemfilename;
 	vaxlowemfilename = "vaxlowem.txt";
-	std::ofstream vaxlowemfile;
+	auto& vaxlowemfile = streams.output();
 	vaxlowemfile.open(vaxlowemfilename);
+	if (!vaxlowemfile) throw std::runtime_error("Could not open " + std::string(vaxlowemfilename));
 
 
 
@@ -3553,18 +1313,21 @@ int main()
 
 	std::string vaxmedvxfilename;
 	vaxmedvxfilename = "vaxmedvx.txt";
-	std::ofstream vaxmedvxfile;
+	auto& vaxmedvxfile = streams.output();
 	vaxmedvxfile.open(vaxmedvxfilename);
+	if (!vaxmedvxfile) throw std::runtime_error("Could not open " + std::string(vaxmedvxfilename));
 
 	std::string vaxmedcdfilename;
 	vaxmedcdfilename = "vaxmedcd.txt";
-	std::ofstream vaxmedcdfile;
+	auto& vaxmedcdfile = streams.output();
 	vaxmedcdfile.open(vaxmedcdfilename);
+	if (!vaxmedcdfile) throw std::runtime_error("Could not open " + std::string(vaxmedcdfilename));
 
 	std::string vaxmedemfilename;
 	vaxmedemfilename = "vaxmedem.txt";
-	std::ofstream vaxmedemfile;
+	auto& vaxmedemfile = streams.output();
 	vaxmedemfile.open(vaxmedemfilename);
+	if (!vaxmedemfile) throw std::runtime_error("Could not open " + std::string(vaxmedemfilename));
 
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < vaxmed.size(); i++) {
@@ -3578,18 +1341,21 @@ int main()
 	}
 	std::string vaxhighvxfilename;
 	vaxhighvxfilename = "vaxhighvx.txt";
-	std::ofstream vaxhighvxfile;
+	auto& vaxhighvxfile = streams.output();
 	vaxhighvxfile.open(vaxhighvxfilename);
+	if (!vaxhighvxfile) throw std::runtime_error("Could not open " + std::string(vaxhighvxfilename));
 
 	std::string vaxhighcdfilename;
 	vaxhighcdfilename = "vaxhighcd.txt";
-	std::ofstream vaxhighcdfile;
+	auto& vaxhighcdfile = streams.output();
 	vaxhighcdfile.open(vaxhighcdfilename);
+	if (!vaxhighcdfile) throw std::runtime_error("Could not open " + std::string(vaxhighcdfilename));
 
 	std::string vaxhighemfilename;
 	vaxhighemfilename = "vaxhighem.txt";
-	std::ofstream vaxhighemfile;
+	auto& vaxhighemfile = streams.output();
 	vaxhighemfile.open(vaxhighemfilename);
+	if (!vaxhighemfile) throw std::runtime_error("Could not open " + std::string(vaxhighemfilename));
 
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < vaxhigh.size(); i++) {
@@ -3610,8 +1376,9 @@ int main()
 	// OUTPUT FILES FOR PYTHON
 	std::string clusteringcdfilename;
 	clusteringcdfilename = "clusteringcd.txt";
-	std::ofstream clusteringcdfile;
+	auto& clusteringcdfile = streams.output();
 	clusteringcdfile.open(clusteringcdfilename);
+	if (!clusteringcdfile) throw std::runtime_error("Could not open " + std::string(clusteringcdfilename));
 	for (unsigned int i = 0; i < numentities; i++)
 		if (cumvax[i] > 0 && !continent[i].empty()) {
 			for (int d = 0; d < numprevaxdates; d++)
@@ -3623,37 +1390,44 @@ int main()
 
 	std::string clusteringemfilename;
 	clusteringemfilename = "clusteringem.txt";
-	std::ofstream clusteringemfile;
+	auto& clusteringemfile = streams.output();
 	clusteringemfile.open(clusteringemfilename);
+	if (!clusteringemfile) throw std::runtime_error("Could not open " + std::string(clusteringemfilename));
 	for (unsigned int i = 0; i < numentities; i++)
 		if (cumvax[i] > 0 && !continent[i].empty()) {
 			for (int d = 0; d < numprevaxdates; d++)
-				clusteringemfile << excessmortalitypscoreinterpolated[i][d] << "\t";
+				clusteringemfile << excessmortalitypscoreprevax[i][d] << "\t";
 	        clusteringemfile << "\n";
 		}
 	clusteringemfile.flush();
 	clusteringemfile.close();
 
 	std::cout << std::endl;
-	std::cout << "1) Copy this program's output files to the directory containing clustering.py." << std::endl;
-	std::cout << "2) Run clustering.py." << std::endl;
-	std::cout << "3) Copy clusters.txt from the clustering.py directory to the directory containg OurWorldinData.exe." << std::endl;
-	std::cout << "4) ";
-	system("pause");
+    std::ofstream country_order("clustering_countries.txt");
+    if (!country_order) throw std::runtime_error("Could not write clustering_countries.txt");
+    for (int i = 0; i < numentities; ++i)
+        if (cumvax[i] > 0 && !continent[i].empty()) country_order << code[i] << '\n';
+    country_order.close();
+    if (prepare_only) { std::cout << "Clustering inputs prepared. Run clustering.py, then rerun with --use-clusters.\n"; return 0; }
+	std::cout << "1) Keep clustering.py with clusteringcd.txt, clusteringem.txt and clustering_countries.txt." << std::endl;
+	std::cout << "2) Run: py clustering.py" << std::endl;
+	std::cout << "3) Keep clusters.txt and clusters.inputs.fnv in this program's working directory." << std::endl;
+	if (!use_clusters) { std::cout << "4) Press Enter after clustering.py has finished. " << std::flush; std::cin.get(); }
 	
 
 
 	int mc = 19;
 	int c;
 
-	// std::vector<std::vector<double>> coviddeaths(numentities, std::vector<double>(numdates, nan("")));
+	// std::vector<std::vector<double>> coviddeaths(numentities, std::vector<double>(numdates, std::nan("")));
 	std::vector<std::vector<int>> clustcd(mc);
 	std::vector<std::vector<int>> clustem(mc);
 
 	std::string clustersfilename;
 	clustersfilename = "clusters.txt";
-	std::ifstream clustersfile;
+	auto& clustersfile = streams.input();
 	clustersfile.open(clustersfilename);
+	if (!clustersfile) throw std::runtime_error("Could not open " + std::string(clustersfilename));
 	std::string line;
 
 	for (int i = 0; i < mc; i++) { // reads in 19 lines
@@ -3671,6 +1445,24 @@ int main()
 	std::cout << ".";
 
 
+
+    const std::size_t expected_countries = vaxlow.size() + vaxmed.size() + vaxhigh.size();
+    for (int row = 0; row < mc; ++row) {
+        for (const auto* labels : {&clustcd[row], &clustem[row]}) {
+            if (labels->size() != expected_countries)
+                throw std::runtime_error("clusters.txt has the wrong number of countries; rerun clustering.py.");
+            for (int label : *labels)
+                if (label < -1 || label >= row + 2)
+                    throw std::runtime_error("Invalid cluster label in clusters.txt.");
+        }
+    }
+    std::ifstream fingerprints("clusters.inputs.fnv");
+    std::uint64_t cd_hash, em_hash, country_hash;
+    if (!(fingerprints >> cd_hash >> em_hash >> country_hash) ||
+        cd_hash != file_fingerprint("clusteringcd.txt") ||
+        em_hash != file_fingerprint("clusteringem.txt") ||
+        country_hash != file_fingerprint("clustering_countries.txt"))
+        throw std::runtime_error("Cluster inputs changed or fingerprints are missing; rerun the reviewed clustering.py.");
 
 	// clustcd[c] and clustem[c] only include clustering countries
 	// For example, clustcd3 is a list of clusters, when there are three clusters (0, 1, 2)
@@ -3690,13 +1482,14 @@ int main()
 	std::vector<int> lockdownhigh;
 	double tl1, tl2;
 	for (unsigned int i = 0; i < numentities; i++)
-		if (cumlockdowns[i] != 0 && !continent[i].empty()) // ignore all zero values and non countries
+		if (cumlockdowns[i] > 0 && !continent[i].empty()) // ignore all zero values and non countries
 			templockdown.push_back(cumlockdowns[i]);
+	if (templockdown.size() < 3) throw std::runtime_error("Too few eligible countries for tertiles: templockdown");
 	std::sort(templockdown.begin(), templockdown.end());
-	tl1 = templockdown[round((templockdown.size() / 3) - 1)];
-	tl2 = templockdown[round((2 * templockdown.size() / 3) - 1)];
+	tl1 = templockdown[std::round((templockdown.size() / 3) - 1)];
+	tl2 = templockdown[std::round((2 * templockdown.size() / 3) - 1)];
 	for (unsigned int i = 0; i < numentities; i++)
-		if (cumlockdowns[i] != 0) {
+		if (cumlockdowns[i] > 0 && !continent[i].empty()) {
 			if (cumlockdowns[i] <= tl1)
 				lockdownlow.push_back(i);
 			else if (cumlockdowns[i] <= tl2)
@@ -3706,8 +1499,8 @@ int main()
 		}
 
 
-	outputfile << "Countries with low lockdown stringency" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency" << std::endl;
+	outputfile << "Countries with low cumulative stringency" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < lockdownlow.size(); i++)
 		display.push_back(entity[lockdownlow[i]] + "\t" + tostring(cumlockdowns[lockdownlow[i]]));
 	std::sort(display.begin(), display.end());
@@ -3716,8 +1509,8 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with medium lockdown stringency" << std::endl;
-	outputfile << "Countr // reads in 19 linesn stringency" << std::endl;
+	outputfile << "Countries with medium cumulative stringency" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < lockdownmed.size(); i++)
 		display.push_back(entity[lockdownmed[i]] + "\t" + tostring(cumlockdowns[lockdownmed[i]]));
 	for (unsigned int i = 0; i < display.size(); i++)
@@ -3725,8 +1518,8 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with high lockdown stringency" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency" << std::endl;
+	outputfile << "Countries with high cumulative stringency" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < lockdownhigh.size(); i++)
 		display.push_back(entity[lockdownhigh[i]] + "\t" + tostring(cumlockdowns[lockdownhigh[i]]));
 	std::sort(display.begin(), display.end());
@@ -3737,12 +1530,14 @@ int main()
 
 	std::string lockdownlowldfilename;
 	lockdownlowldfilename = "lockdownlowld.txt";
-	std::ofstream lockdownlowldfile;
+	auto& lockdownlowldfile = streams.output();
 	lockdownlowldfile.open(lockdownlowldfilename);
+	if (!lockdownlowldfile) throw std::runtime_error("Could not open " + std::string(lockdownlowldfilename));
 	std::string lockdownlowemfilename;
 	lockdownlowemfilename = "lockdownlowem.txt";
-	std::ofstream lockdownlowemfile;
+	auto& lockdownlowemfile = streams.output();
 	lockdownlowemfile.open(lockdownlowemfilename);
+	if (!lockdownlowemfile) throw std::runtime_error("Could not open " + std::string(lockdownlowemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownlow.size(); i++) {
 			lockdownlowldfile << lockdown[lockdownlow[i]][d] << "\t";
@@ -3753,12 +1548,14 @@ int main()
 	}
 	std::string lockdownmedldfilename;
 	lockdownmedldfilename = "lockdownmedld.txt";
-	std::ofstream lockdownmedldfile;
+	auto& lockdownmedldfile = streams.output();
 	lockdownmedldfile.open(lockdownmedldfilename);
+	if (!lockdownmedldfile) throw std::runtime_error("Could not open " + std::string(lockdownmedldfilename));
 	std::string lockdownmedemfilename;
 	lockdownmedemfilename = "lockdownmedem.txt";
-	std::ofstream lockdownmedemfile;
+	auto& lockdownmedemfile = streams.output();
 	lockdownmedemfile.open(lockdownmedemfilename);
+	if (!lockdownmedemfile) throw std::runtime_error("Could not open " + std::string(lockdownmedemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownmed.size(); i++) {
 			lockdownmedldfile << lockdown[lockdownmed[i]][d] << "\t";
@@ -3769,12 +1566,14 @@ int main()
 	}
 	std::string lockdownhighldfilename;
 	lockdownhighldfilename = "lockdownhighld.txt";
-	std::ofstream lockdownhighldfile;
+	auto& lockdownhighldfile = streams.output();
 	lockdownhighldfile.open(lockdownhighldfilename);
+	if (!lockdownhighldfile) throw std::runtime_error("Could not open " + std::string(lockdownhighldfilename));
 	std::string lockdownhighemfilename;
 	lockdownhighemfilename = "lockdownhighem.txt";
-	std::ofstream lockdownhighemfile;
+	auto& lockdownhighemfile = streams.output();
 	lockdownhighemfile.open(lockdownhighemfilename);
+	if (!lockdownhighemfile) throw std::runtime_error("Could not open " + std::string(lockdownhighemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownhigh.size(); i++) {
 			lockdownhighldfile << lockdown[lockdownhigh[i]][d] << "\t";
@@ -3796,11 +1595,12 @@ int main()
 	for (unsigned int i = 0; i < numentities; i++)
 		if (cummasks[i] > 0 && !continent[i].empty()) // ignore all zero values and non countries
 			tempmasks.push_back(cummasks[i]);
+	if (tempmasks.size() < 3) throw std::runtime_error("Too few eligible countries for tertiles: tempmasks");
 	std::sort(tempmasks.begin(), tempmasks.end());
-	tm1 = tempmasks[round((tempmasks.size() / 3) - 1)];
-	tm2 = tempmasks[round((2 * tempmasks.size() / 3) - 1)];
+	tm1 = tempmasks[std::round((tempmasks.size() / 3) - 1)];
+	tm2 = tempmasks[std::round((2 * tempmasks.size() / 3) - 1)];
 	for (unsigned int i = 0; i < numentities; i++)
-		if (cummasks[i] != 0) {
+		if (cummasks[i] > 0 && !continent[i].empty()) {
 			if (cummasks[i] <= tm1)
 				maskslow.push_back(i);
 			else if (cummasks[i] <= tm2)
@@ -3809,8 +1609,8 @@ int main()
 				maskshigh.push_back(i);
 		}
 	std::cout << ".";
-	outputfile << "Countries with low mask policies" << std::endl;
-	outputfile << "Country\tCumulative facial coverings index" << std::endl;
+	outputfile << "Countries with low cumulative face-covering policy index" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < maskslow.size(); i++)
 		display.push_back(entity[maskslow[i]] + "\t" + tostring(cummasks[maskslow[i]]));
 	std::sort(display.begin(), display.end());
@@ -3820,8 +1620,8 @@ int main()
 	display.clear();
 
 
-	outputfile << "Countries with medium mask policies" << std::endl;
-	outputfile << "Country\tCumulative facial coverings index" << std::endl;
+	outputfile << "Countries with medium cumulative face-covering policy index" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < masksmed.size(); i++)
 		display.push_back(entity[masksmed[i]] + "\t" + tostring(cummasks[masksmed[i]]));
 	std::sort(display.begin(), display.end());
@@ -3830,8 +1630,8 @@ int main()
 	outputfile << std::endl;
 	display.clear();
 
-	outputfile << "Countries with high mask policies" << std::endl;
-	outputfile << "Country\tCumulative facial coverings index" << std::endl;
+	outputfile << "Countries with high cumulative face-covering policy index" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)" << std::endl;
 	for (unsigned int i = 0; i < maskshigh.size(); i++)
 		display.push_back(entity[maskshigh[i]] + "\t" + tostring(cummasks[maskshigh[i]]));
 	std::sort(display.begin(), display.end());
@@ -3843,12 +1643,14 @@ int main()
 
 	std::string maskslowmafilename;
 	maskslowmafilename = "maskslowma.txt";
-	std::ofstream maskslowmafile;
+	auto& maskslowmafile = streams.output();
 	maskslowmafile.open(maskslowmafilename);
+	if (!maskslowmafile) throw std::runtime_error("Could not open " + std::string(maskslowmafilename));
 	std::string maskslowemfilename;
 	maskslowemfilename = "maskslowem.txt";
-	std::ofstream maskslowemfile;
+	auto& maskslowemfile = streams.output();
 	maskslowemfile.open(maskslowemfilename);
+	if (!maskslowemfile) throw std::runtime_error("Could not open " + std::string(maskslowemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskslow.size(); i++) {
 			maskslowmafile << masks[maskslow[i]][d] << "\t";
@@ -3859,12 +1661,14 @@ int main()
 	}
 	std::string masksmedmafilename;
 	masksmedmafilename = "masksmedma.txt";
-	std::ofstream masksmedmafile;
+	auto& masksmedmafile = streams.output();
 	masksmedmafile.open(masksmedmafilename);
+	if (!masksmedmafile) throw std::runtime_error("Could not open " + std::string(masksmedmafilename));
 	std::string masksmedemfilename;
 	masksmedemfilename = "masksmedem.txt";
-	std::ofstream masksmedemfile;
+	auto& masksmedemfile = streams.output();
 	masksmedemfile.open(masksmedemfilename);
+	if (!masksmedemfile) throw std::runtime_error("Could not open " + std::string(masksmedemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < masksmed.size(); i++) {
 			masksmedmafile << masks[masksmed[i]][d] << "\t";
@@ -3876,12 +1680,14 @@ int main()
 	std::cout << ".";
 	std::string maskshighmafilename;
 	maskshighmafilename = "maskshighma.txt";
-	std::ofstream maskshighmafile;
+	auto& maskshighmafile = streams.output();
 	maskshighmafile.open(maskshighmafilename);
+	if (!maskshighmafile) throw std::runtime_error("Could not open " + std::string(maskshighmafilename));
 	std::string maskshighemfilename;
 	maskshighemfilename = "maskshighem.txt";
-	std::ofstream maskshighemfile;
+	auto& maskshighemfile = streams.output();
 	maskshighemfile.open(maskshighemfilename);
+	if (!maskshighemfile) throw std::runtime_error("Could not open " + std::string(maskshighemfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskshigh.size(); i++) {
 			maskshighmafile << masks[maskshigh[i]][d] << "\t";
@@ -3908,15 +1714,16 @@ int main()
 	for (unsigned int i = 0; i < maskslowvaxlow.size(); i++)
 		display.push_back(entity[maskslowvaxlow[i]] + "\t" + tostring(cummasks[maskslowvaxlow[i]]) + "\t" + tostring(cumvax[maskslowvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with low face covering policy stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative face-covering policy index and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskslowvaxlowfilename;
 	maskslowvaxlowfilename = "maskslowvaxlow.txt";
-	std::ofstream maskslowvaxlowfile;
+	auto& maskslowvaxlowfile = streams.output();
 	maskslowvaxlowfile.open(maskslowvaxlowfilename);
+	if (!maskslowvaxlowfile) throw std::runtime_error("Could not open " + std::string(maskslowvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskslowvaxlow.size(); i++)
 			maskslowvaxlowfile << excessmortalitypscoreinterpolated[maskslowvaxlow[i]][d] << "\t";
@@ -3933,15 +1740,16 @@ int main()
 	for (unsigned int i = 0; i < maskslowvaxmed.size(); i++)
 		display.push_back(entity[maskslowvaxmed[i]] + "\t" + tostring(cummasks[maskslowvaxmed[i]]) + "\t" + tostring(cumvax[maskslowvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low face covering policy stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative face-covering policy index and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskslowvaxmedfilename;
 	maskslowvaxmedfilename = "maskslowvaxmed.txt";
-	std::ofstream maskslowvaxmedfile;
+	auto& maskslowvaxmedfile = streams.output();
 	maskslowvaxmedfile.open(maskslowvaxmedfilename);
+	if (!maskslowvaxmedfile) throw std::runtime_error("Could not open " + std::string(maskslowvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskslowvaxmed.size(); i++)
 			maskslowvaxmedfile << excessmortalitypscoreinterpolated[maskslowvaxmed[i]][d] << "\t";
@@ -3958,15 +1766,16 @@ int main()
 	for (unsigned int i = 0; i < maskslowvaxhigh.size(); i++)
 		display.push_back(entity[maskslowvaxhigh[i]] + "\t" + tostring(cummasks[maskslowvaxhigh[i]]) + "\t" + tostring(cumvax[maskslowvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low face covering policy stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative face-covering policy index and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskslowvaxhighfilename;
 	maskslowvaxhighfilename = "maskslowvaxhigh.txt";
-	std::ofstream maskslowvaxhighfile;
+	auto& maskslowvaxhighfile = streams.output();
 	maskslowvaxhighfile.open(maskslowvaxhighfilename);
+	if (!maskslowvaxhighfile) throw std::runtime_error("Could not open " + std::string(maskslowvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskslowvaxhigh.size(); i++)
 			maskslowvaxhighfile << excessmortalitypscoreinterpolated[maskslowvaxhigh[i]][d] << "\t";
@@ -3983,15 +1792,16 @@ int main()
 	for (unsigned int i = 0; i < masksmedvaxlow.size(); i++)
 		display.push_back(entity[masksmedvaxlow[i]] + "\t" + tostring(cummasks[masksmedvaxlow[i]]) + "\t" + tostring(cumvax[masksmedvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium face covering policy stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative face-covering policy index and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string masksmedvaxlowfilename;
 	masksmedvaxlowfilename = "masksmedvaxlow.txt";
-	std::ofstream masksmedvaxlowfile;
+	auto& masksmedvaxlowfile = streams.output();
 	masksmedvaxlowfile.open(masksmedvaxlowfilename);
+	if (!masksmedvaxlowfile) throw std::runtime_error("Could not open " + std::string(masksmedvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < masksmedvaxlow.size(); i++)
 			masksmedvaxlowfile << excessmortalitypscoreinterpolated[masksmedvaxlow[i]][d] << "\t";
@@ -4008,15 +1818,16 @@ int main()
 	for (unsigned int i = 0; i < masksmedvaxmed.size(); i++)
 		display.push_back(entity[masksmedvaxmed[i]] + "\t" + tostring(cummasks[masksmedvaxmed[i]]) + "\t" + tostring(cumvax[masksmedvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium face covering policy stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative face-covering policy index and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string masksmedvaxmedfilename;
 	masksmedvaxmedfilename = "masksmedvaxmed.txt";
-	std::ofstream masksmedvaxmedfile;
+	auto& masksmedvaxmedfile = streams.output();
 	masksmedvaxmedfile.open(masksmedvaxmedfilename);
+	if (!masksmedvaxmedfile) throw std::runtime_error("Could not open " + std::string(masksmedvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < masksmedvaxmed.size(); i++)
 			masksmedvaxmedfile << excessmortalitypscoreinterpolated[masksmedvaxmed[i]][d] << "\t";
@@ -4033,15 +1844,16 @@ int main()
 	for (unsigned int i = 0; i < masksmedvaxhigh.size(); i++)
 		display.push_back(entity[masksmedvaxhigh[i]] + "\t" + tostring(cummasks[masksmedvaxhigh[i]]) + "\t" + tostring(cumvax[masksmedvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium face covering policy stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative face-covering policy index and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string masksmedvaxhighfilename;
 	masksmedvaxhighfilename = "masksmedvaxhigh.txt";
-	std::ofstream masksmedvaxhighfile;
+	auto& masksmedvaxhighfile = streams.output();
 	masksmedvaxhighfile.open(masksmedvaxhighfilename);
+	if (!masksmedvaxhighfile) throw std::runtime_error("Could not open " + std::string(masksmedvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < masksmedvaxhigh.size(); i++)
 			masksmedvaxhighfile << excessmortalitypscoreinterpolated[masksmedvaxhigh[i]][d] << "\t";
@@ -4058,15 +1870,16 @@ int main()
 	for (unsigned int i = 0; i < maskshighvaxlow.size(); i++)
 		display.push_back(entity[maskshighvaxlow[i]] + "\t" + tostring(cummasks[maskshighvaxlow[i]]) + "\t" + tostring(cumvax[maskshighvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high face covering policy stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative face-covering policy index and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskshighvaxlowfilename;
 	maskshighvaxlowfilename = "maskshighvaxlow.txt";
-	std::ofstream maskshighvaxlowfile;
+	auto& maskshighvaxlowfile = streams.output();
 	maskshighvaxlowfile.open(maskshighvaxlowfilename);
+	if (!maskshighvaxlowfile) throw std::runtime_error("Could not open " + std::string(maskshighvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskshighvaxlow.size(); i++)
 			maskshighvaxlowfile << excessmortalitypscoreinterpolated[maskshighvaxlow[i]][d] << "\t";
@@ -4083,15 +1896,16 @@ int main()
 	for (unsigned int i = 0; i < maskshighvaxmed.size(); i++)
 		display.push_back(entity[maskshighvaxmed[i]] + "\t" + tostring(cummasks[maskshighvaxmed[i]]) + "\t" + tostring(cumvax[maskshighvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high face covering policy stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative face-covering policy index and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskshighvaxmedfilename;
 	maskshighvaxmedfilename = "maskshighvaxmed.txt";
-	std::ofstream maskshighvaxmedfile;
+	auto& maskshighvaxmedfile = streams.output();
 	maskshighvaxmedfile.open(maskshighvaxmedfilename);
+	if (!maskshighvaxmedfile) throw std::runtime_error("Could not open " + std::string(maskshighvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskshighvaxmed.size(); i++)
 			maskshighvaxmedfile << excessmortalitypscoreinterpolated[maskshighvaxmed[i]][d] << "\t";
@@ -4108,15 +1922,16 @@ int main()
 	for (unsigned int i = 0; i < maskshighvaxhigh.size(); i++)
 		display.push_back(entity[maskshighvaxhigh[i]] + "\t" + tostring(cummasks[maskshighvaxhigh[i]]) + "\t" + tostring(cumvax[maskshighvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high face covering policy stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative face covering policy index\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative face-covering policy index and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative face-covering policy (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string maskshighvaxhighfilename;
 	maskshighvaxhighfilename = "maskshighvaxhigh.txt";
-	std::ofstream maskshighvaxhighfile;
+	auto& maskshighvaxhighfile = streams.output();
 	maskshighvaxhighfile.open(maskshighvaxhighfilename);
+	if (!maskshighvaxhighfile) throw std::runtime_error("Could not open " + std::string(maskshighvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < maskshighvaxhigh.size(); i++)
 			maskshighvaxhighfile << excessmortalitypscoreinterpolated[maskshighvaxhigh[i]][d] << "\t";
@@ -4146,15 +1961,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownlowvaxlow.size(); i++)
 		display.push_back(entity[lockdownlowvaxlow[i]] + "\t" + tostring(cumlockdowns[lockdownlowvaxlow[i]]) + "\t" + tostring(cumvax[lockdownlowvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low lockdown stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownlowvaxlowfilename;
 	lockdownlowvaxlowfilename = "lockdownlowvaxlow.txt";
-	std::ofstream lockdownlowvaxlowfile;
+	auto& lockdownlowvaxlowfile = streams.output();
 	lockdownlowvaxlowfile.open(lockdownlowvaxlowfilename);
+	if (!lockdownlowvaxlowfile) throw std::runtime_error("Could not open " + std::string(lockdownlowvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownlowvaxlow.size(); i++)
 			lockdownlowvaxlowfile << excessmortalitypscoreinterpolated[lockdownlowvaxlow[i]][d] << "\t";
@@ -4171,15 +1987,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownlowvaxmed.size(); i++)
 		display.push_back(entity[lockdownlowvaxmed[i]] + "\t" + tostring(cumlockdowns[lockdownlowvaxmed[i]]) + "\t" + tostring(cumvax[lockdownlowvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low lockdown stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative stringency and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownlowvaxmedfilename;
 	lockdownlowvaxmedfilename = "lockdownlowvaxmed.txt";
-	std::ofstream lockdownlowvaxmedfile;
+	auto& lockdownlowvaxmedfile = streams.output();
 	lockdownlowvaxmedfile.open(lockdownlowvaxmedfilename);
+	if (!lockdownlowvaxmedfile) throw std::runtime_error("Could not open " + std::string(lockdownlowvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownlowvaxmed.size(); i++)
 			lockdownlowvaxmedfile << excessmortalitypscoreinterpolated[lockdownlowvaxmed[i]][d] << "\t";
@@ -4196,15 +2013,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownlowvaxhigh.size(); i++)
 		display.push_back(entity[lockdownlowvaxhigh[i]] + "\t" + tostring(cumlockdowns[lockdownlowvaxhigh[i]]) + "\t" + tostring(cumvax[lockdownlowvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low lockdown stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative stringency and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownlowvaxhighfilename;
 	lockdownlowvaxhighfilename = "lockdownlowvaxhigh.txt";
-	std::ofstream lockdownlowvaxhighfile;
+	auto& lockdownlowvaxhighfile = streams.output();
 	lockdownlowvaxhighfile.open(lockdownlowvaxhighfilename);
+	if (!lockdownlowvaxhighfile) throw std::runtime_error("Could not open " + std::string(lockdownlowvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownlowvaxhigh.size(); i++)
 			lockdownlowvaxhighfile << excessmortalitypscoreinterpolated[lockdownlowvaxhigh[i]][d] << "\t";
@@ -4221,15 +2039,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownmedvaxlow.size(); i++)
 		display.push_back(entity[lockdownmedvaxlow[i]] + "\t" + tostring(cumlockdowns[lockdownmedvaxlow[i]]) + "\t" + tostring(cumvax[lockdownmedvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium lockdown stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownmedvaxlowfilename;
 	lockdownmedvaxlowfilename = "lockdownmedvaxlow.txt";
-	std::ofstream lockdownmedvaxlowfile;
+	auto& lockdownmedvaxlowfile = streams.output();
 	lockdownmedvaxlowfile.open(lockdownmedvaxlowfilename);
+	if (!lockdownmedvaxlowfile) throw std::runtime_error("Could not open " + std::string(lockdownmedvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownmedvaxlow.size(); i++)
 			lockdownmedvaxlowfile << excessmortalitypscoreinterpolated[lockdownmedvaxlow[i]][d] << "\t";
@@ -4246,15 +2065,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownmedvaxmed.size(); i++)
 		display.push_back(entity[lockdownmedvaxmed[i]] + "\t" + tostring(cumlockdowns[lockdownmedvaxmed[i]]) + "\t" + tostring(cumvax[lockdownmedvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium lockdown stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative stringency and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownmedvaxmedfilename;
 	lockdownmedvaxmedfilename = "lockdownmedvaxmed.txt";
-	std::ofstream lockdownmedvaxmedfile;
+	auto& lockdownmedvaxmedfile = streams.output();
 	lockdownmedvaxmedfile.open(lockdownmedvaxmedfilename);
+	if (!lockdownmedvaxmedfile) throw std::runtime_error("Could not open " + std::string(lockdownmedvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownmedvaxmed.size(); i++)
 			lockdownmedvaxmedfile << excessmortalitypscoreinterpolated[lockdownmedvaxmed[i]][d] << "\t";
@@ -4271,15 +2091,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownmedvaxhigh.size(); i++)
 		display.push_back(entity[lockdownmedvaxhigh[i]] + "\t" + tostring(cumlockdowns[lockdownmedvaxhigh[i]]) + "\t" + tostring(cumvax[lockdownmedvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium lockdown stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative stringency and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownmedvaxhighfilename;
 	lockdownmedvaxhighfilename = "lockdownmedvaxhigh.txt";
-	std::ofstream lockdownmedvaxhighfile;
+	auto& lockdownmedvaxhighfile = streams.output();
 	lockdownmedvaxhighfile.open(lockdownmedvaxhighfilename);
+	if (!lockdownmedvaxhighfile) throw std::runtime_error("Could not open " + std::string(lockdownmedvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownmedvaxhigh.size(); i++)
 			lockdownmedvaxhighfile << excessmortalitypscoreinterpolated[lockdownmedvaxhigh[i]][d] << "\t";
@@ -4296,15 +2117,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownhighvaxlow.size(); i++)
 		display.push_back(entity[lockdownhighvaxlow[i]] + "\t" + tostring(cumlockdowns[lockdownhighvaxlow[i]]) + "\t" + tostring(cumvax[lockdownhighvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high lockdown stringency and a low vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownhighvaxlowfilename;
 	lockdownhighvaxlowfilename = "lockdownhighvaxlow.txt";
-	std::ofstream lockdownhighvaxlowfile;
+	auto& lockdownhighvaxlowfile = streams.output();
 	lockdownhighvaxlowfile.open(lockdownhighvaxlowfilename);
+	if (!lockdownhighvaxlowfile) throw std::runtime_error("Could not open " + std::string(lockdownhighvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownhighvaxlow.size(); i++)
 			lockdownhighvaxlowfile << excessmortalitypscoreinterpolated[lockdownhighvaxlow[i]][d] << "\t";
@@ -4321,15 +2143,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownhighvaxmed.size(); i++)
 		display.push_back(entity[lockdownhighvaxmed[i]] + "\t" + tostring(cumlockdowns[lockdownhighvaxmed[i]]) + "\t" + tostring(cumvax[lockdownhighvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high lockdown stringency and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative stringency and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownhighvaxmedfilename;
 	lockdownhighvaxmedfilename = "lockdownhighvaxmed.txt";
-	std::ofstream lockdownhighvaxmedfile;
+	auto& lockdownhighvaxmedfile = streams.output();
 	lockdownhighvaxmedfile.open(lockdownhighvaxmedfilename);
+	if (!lockdownhighvaxmedfile) throw std::runtime_error("Could not open " + std::string(lockdownhighvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownhighvaxmed.size(); i++)
 			lockdownhighvaxmedfile << excessmortalitypscoreinterpolated[lockdownhighvaxmed[i]][d] << "\t";
@@ -4346,15 +2169,16 @@ int main()
 	for (unsigned int i = 0; i < lockdownhighvaxhigh.size(); i++)
 		display.push_back(entity[lockdownhighvaxhigh[i]] + "\t" + tostring(cumlockdowns[lockdownhighvaxhigh[i]]) + "\t" + tostring(cumvax[lockdownhighvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high lockdown stringency and a high vaccination rate" << std::endl;
-	outputfile << "Country\tCumulative lockdown stringency\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative stringency and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string lockdownhighvaxhighfilename;
 	lockdownhighvaxhighfilename = "lockdownhighvaxhigh.txt";
-	std::ofstream lockdownhighvaxhighfile;
+	auto& lockdownhighvaxhighfile = streams.output();
 	lockdownhighvaxhighfile.open(lockdownhighvaxhighfilename);
+	if (!lockdownhighvaxhighfile) throw std::runtime_error("Could not open " + std::string(lockdownhighvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < lockdownhighvaxhigh.size(); i++)
 			lockdownhighvaxhighfile << excessmortalitypscoreinterpolated[lockdownhighvaxhigh[i]][d] << "\t";
@@ -4375,15 +2199,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathslowvaxlow.size(); i++)
 		display.push_back(entity[coviddeathslowvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathslowvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate and a low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowvaxlowfilename;
 	coviddeathslowvaxlowfilename = "coviddeathslowvaxlow.txt";
-	std::ofstream coviddeathslowvaxlowfile;
+	auto& coviddeathslowvaxlowfile = streams.output();
 	coviddeathslowvaxlowfile.open(coviddeathslowvaxlowfilename);
+	if (!coviddeathslowvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowvaxlow.size(); i++)
 			coviddeathslowvaxlowfile << excessmortalitypscoreinterpolated[coviddeathslowvaxlow[i]][d] << "\t";
@@ -4400,15 +2225,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathslowvaxmed.size(); i++)
 		display.push_back(entity[coviddeathslowvaxmed[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowvaxmed[i]]) + "\t" + tostring(cumvax[coviddeathslowvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowvaxmedfilename;
 	coviddeathslowvaxmedfilename = "coviddeathslowvaxmed.txt";
-	std::ofstream coviddeathslowvaxmedfile;
+	auto& coviddeathslowvaxmedfile = streams.output();
 	coviddeathslowvaxmedfile.open(coviddeathslowvaxmedfilename);
+	if (!coviddeathslowvaxmedfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowvaxmed.size(); i++)
 			coviddeathslowvaxmedfile << excessmortalitypscoreinterpolated[coviddeathslowvaxmed[i]][d] << "\t";
@@ -4425,15 +2251,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathslowvaxhigh.size(); i++)
 		display.push_back(entity[coviddeathslowvaxhigh[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowvaxhigh[i]]) + "\t" + tostring(cumvax[coviddeathslowvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate and a high vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowvaxhighfilename;
 	coviddeathslowvaxhighfilename = "coviddeathslowvaxhigh.txt";
-	std::ofstream coviddeathslowvaxhighfile;
+	auto& coviddeathslowvaxhighfile = streams.output();
 	coviddeathslowvaxhighfile.open(coviddeathslowvaxhighfilename);
+	if (!coviddeathslowvaxhighfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowvaxhigh.size(); i++)
 			coviddeathslowvaxhighfile << excessmortalitypscoreinterpolated[coviddeathslowvaxhigh[i]][d] << "\t";
@@ -4450,15 +2277,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathsmedvaxlow.size(); i++)
 		display.push_back(entity[coviddeathsmedvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathsmedvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathsmedvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium COVID-19 death rate and a low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative COVID-19 deaths per million and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathsmedvaxlowfilename;
 	coviddeathsmedvaxlowfilename = "coviddeathsmedvaxlow.txt";
-	std::ofstream coviddeathsmedvaxlowfile;
+	auto& coviddeathsmedvaxlowfile = streams.output();
 	coviddeathsmedvaxlowfile.open(coviddeathsmedvaxlowfilename);
+	if (!coviddeathsmedvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathsmedvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathsmedvaxlow.size(); i++)
 			coviddeathsmedvaxlowfile << excessmortalitypscoreinterpolated[coviddeathsmedvaxlow[i]][d] << "\t";
@@ -4475,15 +2303,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathsmedvaxmed.size(); i++)
 		display.push_back(entity[coviddeathsmedvaxmed[i]] + "\t" + tostring(cumcoviddeaths[coviddeathsmedvaxmed[i]]) + "\t" + tostring(cumvax[coviddeathsmedvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium COVID-19 death rate and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative COVID-19 deaths per million and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathsmedvaxmedfilename;
 	coviddeathsmedvaxmedfilename = "coviddeathsmedvaxmed.txt";
-	std::ofstream coviddeathsmedvaxmedfile;
+	auto& coviddeathsmedvaxmedfile = streams.output();
 	coviddeathsmedvaxmedfile.open(coviddeathsmedvaxmedfilename);
+	if (!coviddeathsmedvaxmedfile) throw std::runtime_error("Could not open " + std::string(coviddeathsmedvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathsmedvaxmed.size(); i++)
 			coviddeathsmedvaxmedfile << excessmortalitypscoreinterpolated[coviddeathsmedvaxmed[i]][d] << "\t";
@@ -4500,15 +2329,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathsmedvaxhigh.size(); i++)
 		display.push_back(entity[coviddeathsmedvaxhigh[i]] + "\t" + tostring(cumcoviddeaths[coviddeathsmedvaxhigh[i]]) + "\t" + tostring(cumvax[coviddeathsmedvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a medium COVID-19 death rate and a high vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with medium cumulative COVID-19 deaths per million and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathsmedvaxhighfilename;
 	coviddeathsmedvaxhighfilename = "coviddeathsmedvaxhigh.txt";
-	std::ofstream coviddeathsmedvaxhighfile;
+	auto& coviddeathsmedvaxhighfile = streams.output();
 	coviddeathsmedvaxhighfile.open(coviddeathsmedvaxhighfilename);
+	if (!coviddeathsmedvaxhighfile) throw std::runtime_error("Could not open " + std::string(coviddeathsmedvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathsmedvaxhigh.size(); i++)
 			coviddeathsmedvaxhighfile << excessmortalitypscoreinterpolated[coviddeathsmedvaxhigh[i]][d] << "\t";
@@ -4525,15 +2355,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathshighvaxlow.size(); i++)
 		display.push_back(entity[coviddeathshighvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathshighvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathshighvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high COVID-19 death rate and a low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative COVID-19 deaths per million and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathshighvaxlowfilename;
 	coviddeathshighvaxlowfilename = "coviddeathshighvaxlow.txt";
-	std::ofstream coviddeathshighvaxlowfile;
+	auto& coviddeathshighvaxlowfile = streams.output();
 	coviddeathshighvaxlowfile.open(coviddeathshighvaxlowfilename);
+	if (!coviddeathshighvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathshighvaxlow.size(); i++)
 			coviddeathshighvaxlowfile << excessmortalitypscoreinterpolated[coviddeathshighvaxlow[i]][d] << "\t";
@@ -4550,15 +2381,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathshighvaxmed.size(); i++)
 		display.push_back(entity[coviddeathshighvaxmed[i]] + "\t" + tostring(cumcoviddeaths[coviddeathshighvaxmed[i]]) + "\t" + tostring(cumvax[coviddeathshighvaxmed[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high COVID-19 death rate and a medium vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative COVID-19 deaths per million and medium cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathshighvaxmedfilename;
 	coviddeathshighvaxmedfilename = "coviddeathshighvaxmed.txt";
-	std::ofstream coviddeathshighvaxmedfile;
+	auto& coviddeathshighvaxmedfile = streams.output();
 	coviddeathshighvaxmedfile.open(coviddeathshighvaxmedfilename);
+	if (!coviddeathshighvaxmedfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighvaxmedfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathshighvaxmed.size(); i++)
 			coviddeathshighvaxmedfile << excessmortalitypscoreinterpolated[coviddeathshighvaxmed[i]][d] << "\t";
@@ -4575,15 +2407,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathshighvaxhigh.size(); i++)
 		display.push_back(entity[coviddeathshighvaxhigh[i]] + "\t" + tostring(cumcoviddeaths[coviddeathshighvaxhigh[i]]) + "\t" + tostring(cumvax[coviddeathshighvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high COVID-19 death rate and a high vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccinations per hundred" << std::endl;
+	outputfile << "Countries with high cumulative COVID-19 deaths per million and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathshighvaxhighfilename;
 	coviddeathshighvaxhighfilename = "coviddeathshighvaxhigh.txt";
-	std::ofstream coviddeathshighvaxhighfile;
+	auto& coviddeathshighvaxhighfile = streams.output();
 	coviddeathshighvaxhighfile.open(coviddeathshighvaxhighfilename);
+	if (!coviddeathshighvaxhighfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathshighvaxhigh.size(); i++)
 			coviddeathshighvaxhighfile << excessmortalitypscoreinterpolated[coviddeathshighvaxhigh[i]][d] << "\t";
@@ -4605,17 +2438,18 @@ int main()
 	    if ((std::find(coviddeathslow.begin(), coviddeathslow.end(), i) != coviddeathslow.end()) && (std::find(lockdownlow.begin(), lockdownlow.end(), i) != lockdownlow.end()) && (std::find(vaxlow.begin(), vaxlow.end(), i) != vaxlow.end()))
 		    coviddeathslowlockdownlowvaxlow.push_back(i);
 	for (unsigned int i = 0; i < coviddeathslowlockdownlowvaxlow.size(); i++)
-		display.push_back(entity[coviddeathslowlockdownlowvaxlow[i]] + "\t" + tostring(cumcoviddeaths[lockdownlowvaxlow[i]]) + "\t" + tostring(cumlockdowns[lockdownlowvaxlow[i]]) + "\t" + tostring(cumvax[lockdownlowvaxlow[i]]));
+		display.push_back(entity[coviddeathslowlockdownlowvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowlockdownlowvaxlow[i]]) + "\t" + tostring(cumlockdowns[coviddeathslowlockdownlowvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathslowlockdownlowvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate, low lockdown stringency and low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency\tTotal vaccinations per 100" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million, low cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowlockdownlowvaxlowfilename;
 	coviddeathslowlockdownlowvaxlowfilename = "coviddeathslowlockdownlowvaxlow.txt";
-	std::ofstream coviddeathslowlockdownlowvaxlowfile;
+	auto& coviddeathslowlockdownlowvaxlowfile = streams.output();
 	coviddeathslowlockdownlowvaxlowfile.open(coviddeathslowlockdownlowvaxlowfilename);
+	if (!coviddeathslowlockdownlowvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowlockdownlowvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowlockdownlowvaxlow.size(); i++)
 			coviddeathslowlockdownlowvaxlowfile << excessmortalitypscoreinterpolated[coviddeathslowlockdownlowvaxlow[i]][d] << "\t";
@@ -4632,15 +2466,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathshighlockdownlowvaxlow.size(); i++)
 		display.push_back(entity[coviddeathshighlockdownlowvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathshighlockdownlowvaxlow[i]]) + "\t" + tostring(cumlockdowns[coviddeathshighlockdownlowvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathshighlockdownlowvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a high COVID-19 death rate, low lockdown stringency and low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency\tTotal vaccinations per 100" << std::endl;
+	outputfile << "Countries with high cumulative COVID-19 deaths per million, low cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathshighlockdownlowvaxlowfilename;
 	coviddeathshighlockdownlowvaxlowfilename = "coviddeathshighlockdownlowvaxlow.txt";
-	std::ofstream coviddeathshighlockdownlowvaxlowfile;
+	auto& coviddeathshighlockdownlowvaxlowfile = streams.output();
 	coviddeathshighlockdownlowvaxlowfile.open(coviddeathshighlockdownlowvaxlowfilename);
+	if (!coviddeathshighlockdownlowvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathshighlockdownlowvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathshighlockdownlowvaxlow.size(); i++)
 			coviddeathshighlockdownlowvaxlowfile << excessmortalitypscoreinterpolated[coviddeathshighlockdownlowvaxlow[i]][d] << "\t";
@@ -4657,15 +2492,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathslowlockdownhighvaxlow.size(); i++)
 		display.push_back(entity[coviddeathslowlockdownhighvaxlow[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowlockdownhighvaxlow[i]]) + "\t" + tostring(cumlockdowns[coviddeathslowlockdownhighvaxlow[i]]) + "\t" + tostring(cumvax[coviddeathslowlockdownhighvaxlow[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate, high lockdown stringency and low vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency\tTotal vaccinations per 100" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million, high cumulative stringency and low cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowlockdownhighvaxlowfilename;
 	coviddeathslowlockdownhighvaxlowfilename = "coviddeathslowlockdownhighvaxlow.txt";
-	std::ofstream coviddeathslowlockdownhighvaxlowfile;
+	auto& coviddeathslowlockdownhighvaxlowfile = streams.output();
 	coviddeathslowlockdownhighvaxlowfile.open(coviddeathslowlockdownhighvaxlowfilename);
+	if (!coviddeathslowlockdownhighvaxlowfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowlockdownhighvaxlowfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowlockdownhighvaxlow.size(); i++)
 			coviddeathslowlockdownhighvaxlowfile << excessmortalitypscoreinterpolated[coviddeathslowlockdownhighvaxlow[i]][d] << "\t";
@@ -4682,15 +2518,16 @@ int main()
 	for (unsigned int i = 0; i < coviddeathslowlockdownlowvaxhigh.size(); i++)
 		display.push_back(entity[coviddeathslowlockdownlowvaxhigh[i]] + "\t" + tostring(cumcoviddeaths[coviddeathslowlockdownlowvaxhigh[i]]) + "\t" + tostring(cumlockdowns[coviddeathslowlockdownlowvaxhigh[i]]) + "\t" + tostring(cumvax[coviddeathslowlockdownlowvaxhigh[i]]));
 	std::sort(display.begin(), display.end());
-	outputfile << "Countries with a low COVID-19 death rate, low lockdown stringency and high vaccination rate" << std::endl;
-	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency\tTotal vaccinations per 100" << std::endl;
+	outputfile << "Countries with low cumulative COVID-19 deaths per million, low cumulative stringency and high cumulative vaccine doses per 100 people" << std::endl;
+	outputfile << "Country\tTotal COVID-19 deaths per million\tCumulative lockdown stringency (index-point days)\tTotal vaccine doses per 100 people" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 	outputfile << std::endl;
 	std::string coviddeathslowlockdownlowvaxhighfilename;
 	coviddeathslowlockdownlowvaxhighfilename = "coviddeathslowlockdownlowvaxhigh.txt";
-	std::ofstream coviddeathslowlockdownlowvaxhighfile;
+	auto& coviddeathslowlockdownlowvaxhighfile = streams.output();
 	coviddeathslowlockdownlowvaxhighfile.open(coviddeathslowlockdownlowvaxhighfilename);
+	if (!coviddeathslowlockdownlowvaxhighfile) throw std::runtime_error("Could not open " + std::string(coviddeathslowlockdownlowvaxhighfilename));
 	for (unsigned int d = 0; d < numdates; d++) {
 		for (unsigned int i = 0; i < coviddeathslowlockdownlowvaxhigh.size(); i++)
 			coviddeathslowlockdownlowvaxhighfile << excessmortalitypscoreinterpolated[coviddeathslowlockdownlowvaxhigh[i]][d] << "\t";
@@ -4726,17 +2563,19 @@ int main()
 	std::string country;
 	std::string countrylistfilename;
 	countrylistfilename = "countrylist.txt";
-	std::ofstream countrylistfile;
+	auto& countrylistfile = streams.output();
 	countrylistfile.open(countrylistfilename);
+	if (!countrylistfile) throw std::runtime_error("Could not open " + std::string(countrylistfilename));
 
 	std::string countryfilename;
-	std::ofstream countryfile;
+	auto& countryfile = streams.output();
 	for (int c = 0; c < entity.size(); c++) {
 		country = entity[c];
 		countrylistfile << country << std::endl;
 		std::replace(country.begin(), country.end(), ' ', '_');
 		countryfilename = country + ".txt";
 		countryfile.open(countryfilename);
+		if (!countryfile) throw std::runtime_error("Could not open " + std::string(countryfilename));
 		for (unsigned int d = 0; d < numdates; d++) {
 			date_duration dd(d);
 			date d2 = firstdate + dd;
@@ -4760,1866 +2599,101 @@ int main()
 
 
 
-	// COUNTRY PAIRS
-
-	int ci1, ci2;
-
-	// Algeria vs Egypt CD
-	ci1 = CountryIndex(code, "DZA");
-	ci2 = CountryIndex(code, "EGY");
-	std::string AlgeriaEgyptCDfilename;
-	AlgeriaEgyptCDfilename = "AlgeriaEgyptCD.txt";
-	std::ofstream AlgeriaEgyptCDfile;
-	AlgeriaEgyptCDfile.open(AlgeriaEgyptCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AlgeriaEgyptCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Algeria vs Egypt EM
-	ci1 = CountryIndex(code, "DZA");
-	ci2 = CountryIndex(code, "EGY");
-	std::string AlgeriaEgyptfilename;
-	AlgeriaEgyptfilename = "AlgeriaEgyptEM.txt";
-	std::ofstream AlgeriaEgyptfile;
-	AlgeriaEgyptfile.open(AlgeriaEgyptfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AlgeriaEgyptfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Antigua and Barbuda vs Cuba EM
-	ci1 = CountryIndex(code, "ATG");
-	ci2 = CountryIndex(code, "CUB");
-	std::string AntiguaandBarbudaCubafilename;
-	AntiguaandBarbudaCubafilename = "AntiguaandBarbudaCubaEM.txt";
-	std::ofstream AntiguaandBarbudaCubafile;
-	AntiguaandBarbudaCubafile.open(AntiguaandBarbudaCubafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AntiguaandBarbudaCubafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Argentina vs Paraguay EM
-	ci1 = CountryIndex(code, "ARG");
-	ci2 = CountryIndex(code, "PRY");
-	std::string ArgentinaParaguayfilename;
-	ArgentinaParaguayfilename = "ArgentinaParaguayEM.txt";
-	std::ofstream ArgentinaParaguayfile;
-	ArgentinaParaguayfile.open(ArgentinaParaguayfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		ArgentinaParaguayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Armenia vs Azerbaijan CD
-	ci1 = CountryIndex(code, "ARM");
-	ci2 = CountryIndex(code, "AZE");
-	std::string ArmeniaAzerbaijanCDfilename;
-	ArmeniaAzerbaijanCDfilename = "ArmeniaAzerbaijanCD.txt";
-	std::ofstream ArmeniaAzerbaijanCDfile;
-	ArmeniaAzerbaijanCDfile.open(ArmeniaAzerbaijanCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		ArmeniaAzerbaijanCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Armenia vs Azerbaijan EM
-	ci1 = CountryIndex(code, "ARM");
-	ci2 = CountryIndex(code, "AZE");
-	std::string ArmeniaAzerbaijanfilename;
-	ArmeniaAzerbaijanfilename = "ArmeniaAzerbaijanEM.txt";
-	std::ofstream ArmeniaAzerbaijanfile;
-	ArmeniaAzerbaijanfile.open(ArmeniaAzerbaijanfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		ArmeniaAzerbaijanfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Australia vs French Polynesia EM
-	ci1 = CountryIndex(code, "AUS");
-	ci2 = CountryIndex(code, "PYF");
-	std::string AustraliaFrenchPolynesiafilename;
-	AustraliaFrenchPolynesiafilename = "AustraliaFrenchPolynesiaEM.txt";
-	std::ofstream AustraliaFrenchPolynesiafile;
-	AustraliaFrenchPolynesiafile.open(AustraliaFrenchPolynesiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AustraliaFrenchPolynesiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Australia vs New Caledonia EM
-	ci1 = CountryIndex(code, "AUS");
-	ci2 = CountryIndex(code, "NCL");
-	std::string AustraliaNewCaledoniafilename;
-	AustraliaNewCaledoniafilename = "AustraliaNewCaledoniaEM.txt";
-	std::ofstream AustraliaNewCaledoniafile;
-	AustraliaNewCaledoniafile.open(AustraliaNewCaledoniafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AustraliaNewCaledoniafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Australia vs New Zealand CD
-	ci1 = CountryIndex(code, "AUS");
-	ci2 = CountryIndex(code, "NZL");
-	std::string AustraliaNewZealandCDfilename;
-	AustraliaNewZealandCDfilename = "AustraliaNewZealandCD.txt";
-	std::ofstream AustraliaNewZealandCDfile;
-	AustraliaNewZealandCDfile.open(AustraliaNewZealandCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AustraliaNewZealandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Australia vs New Zealand EM
-	ci1 = CountryIndex(code, "AUS");
-	ci2 = CountryIndex(code, "NZL");
-	std::string AustraliaNewZealandfilename;
-	AustraliaNewZealandfilename = "AustraliaNewZealandEM.txt";
-	std::ofstream AustraliaNewZealandfile;
-	AustraliaNewZealandfile.open(AustraliaNewZealandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AustraliaNewZealandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Australia vs Malaysia EM
-	ci1 = CountryIndex(code, "AUS");
-	ci2 = CountryIndex(code, "MYS");
-	std::string AustraliaMalaysiafilename;
-	AustraliaMalaysiafilename = "AustraliaMalaysiaEM.txt";
-	std::ofstream AustraliaMalaysiafile;
-	AustraliaMalaysiafile.open(AustraliaMalaysiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		AustraliaMalaysiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Belarus vs Denmark CD
-	ci1 = CountryIndex(code, "BLR");
-	ci2 = CountryIndex(code, "DNK");
-	std::string BelarusDenmarkCDfilename;
-	BelarusDenmarkCDfilename = "BelarusDenmarkCD.txt";
-	std::ofstream BelarusDenmarkCDfile;
-	BelarusDenmarkCDfile.open(BelarusDenmarkCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BelarusDenmarkCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Belarus vs Denmark EM
-	ci1 = CountryIndex(code, "BLR");
-	ci2 = CountryIndex(code, "DNK");
-	std::string BelarusDenmarkfilename;
-	BelarusDenmarkfilename = "BelarusDenmarkEM.txt";
-	std::ofstream BelarusDenmarkfile;
-	BelarusDenmarkfile.open(BelarusDenmarkfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BelarusDenmarkfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bhutan vs Singapore CD
-	ci1 = CountryIndex(code, "BTN");
-	ci2 = CountryIndex(code, "SGP");
-	std::string BhutanSingaporeCDfilename;
-	BhutanSingaporeCDfilename = "BhutanSingaporeCD.txt";
-	std::ofstream BhutanSingaporeCDfile;
-	BhutanSingaporeCDfile.open(BhutanSingaporeCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BhutanSingaporeCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bhutan vs Singapore EM
-	ci1 = CountryIndex(code, "BTN");
-	ci2 = CountryIndex(code, "SGP");
-	std::string BhutanSingaporefilename;
-	BhutanSingaporefilename = "BhutanSingaporeEM.txt";
-	std::ofstream BhutanSingaporefile;
-	BhutanSingaporefile.open(BhutanSingaporefilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BhutanSingaporefile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bhutan vs Thailand CD
-	ci1 = CountryIndex(code, "BTN");
-	ci2 = CountryIndex(code, "THA");
-	std::string BhutanThailandCDfilename;
-	BhutanThailandCDfilename = "BhutanThailandCD.txt";
-	std::ofstream BhutanThailandCDfile;
-	BhutanThailandCDfile.open(BhutanThailandCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BhutanThailandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bhutan vs Thailand EM
-	ci1 = CountryIndex(code, "BTN");
-	ci2 = CountryIndex(code, "THA");
-	std::string BhutanThailandfilename;
-	BhutanThailandfilename = "BhutanThailandEM.txt";
-	std::ofstream BhutanThailandfile;
-	BhutanThailandfile.open(BhutanThailandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BhutanThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bhutan vs Vietnam CD
-	ci1 = CountryIndex(code, "BTN");
-	ci2 = CountryIndex(code, "VNM");
-	std::string BhutanVietnamCDfilename;
-	BhutanVietnamCDfilename = "BhutanVietnamCD.txt";
-	std::ofstream BhutanVietnamCDfile;
-	BhutanVietnamCDfile.open(BhutanVietnamCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BhutanVietnamCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Burundi vs Eritrea CD
-	ci1 = CountryIndex(code, "BDI");
-	ci2 = CountryIndex(code, "ERI");
-	std::string BurundiEritreaCDfilename;
-	BurundiEritreaCDfilename = "BurundiEritreaCD.txt";
-	std::ofstream BurundiEritreaCDfile;
-	BurundiEritreaCDfile.open(BurundiEritreaCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BurundiEritreaCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bosnia and Herzegovina vs Romania EM
-	ci1 = CountryIndex(code, "BIH");
-	ci2 = CountryIndex(code, "ROU");
-	std::string BosniaandHerzegovinaRomaniafilename;
-	BosniaandHerzegovinaRomaniafilename = "BosniaandHerzegovinaRomaniaEM.txt";
-	std::ofstream BosniaandHerzegovinaRomaniafile;
-	BosniaandHerzegovinaRomaniafile.open(BosniaandHerzegovinaRomaniafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BosniaandHerzegovinaRomaniafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Bulgaria vs Serbia EM
-	ci1 = CountryIndex(code, "BGR");
-	ci2 = CountryIndex(code, "SRB");
-	std::string BulgariaSerbiafilename;
-	BulgariaSerbiafilename = "BulgariaSerbiaEM.txt";
-	std::ofstream BulgariaSerbiafile;
-	BulgariaSerbiafile.open(BulgariaSerbiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BulgariaSerbiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Burundi vs Seychelles CD
-	ci1 = CountryIndex(code, "BDI");
-	ci2 = CountryIndex(code, "SYC");
-	std::string BurundiSeychellesCDfilename;
-	BurundiSeychellesCDfilename = "BurundiSeychellesCD.txt";
-	std::ofstream BurundiSeychellesCDfile;
-	BurundiSeychellesCDfile.open(BurundiSeychellesCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		BurundiSeychellesCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Cambodia vs Vietnam CD
-	ci1 = CountryIndex(code, "KHM");
-	ci2 = CountryIndex(code, "VNM");
-	std::string CambodiaVietnamCDfilename;
-	CambodiaVietnamCDfilename = "CambodiaVietnamCD.txt";
-	std::ofstream CambodiaVietnamCDfile;
-	CambodiaVietnamCDfile.open(CambodiaVietnamCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CambodiaVietnamCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Canada vs Cuba EM
-	ci1 = CountryIndex(code, "CAN");
-	ci2 = CountryIndex(code, "CUB");
-	std::string CanadaCubafilename;
-	CanadaCubafilename = "CanadaCubaEM.txt";
-	std::ofstream CanadaCubafile;
-	CanadaCubafile.open(CanadaCubafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CanadaCubafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Canada vs Saint Vincent and the Grenadines EM
-	ci1 = CountryIndex(code, "CAN");
-	ci2 = CountryIndex(code, "VCT");
-	std::string CanadaSaintVincentandtheGrenadinesfilename;
-	CanadaSaintVincentandtheGrenadinesfilename = "CanadaSaintVincentandtheGrenadinesEM.txt";
-	std::ofstream CanadaSaintVincentandtheGrenadinesfile;
-	CanadaSaintVincentandtheGrenadinesfile.open(CanadaSaintVincentandtheGrenadinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CanadaSaintVincentandtheGrenadinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Cape Verde vs Tunisia EM
-	ci1 = CountryIndex(code, "CPV");
-	ci2 = CountryIndex(code, "TUN");
-	std::string CapeVerdeTunisiafilename;
-	CapeVerdeTunisiafilename = "CapeVerdeTunisiaEM.txt";
-	std::ofstream CapeVerdeTunisiafile;
-	CapeVerdeTunisiafile.open(CapeVerdeTunisiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CapeVerdeTunisiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary CD
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungaryCDfilename;
-	CroatiaHungaryCDfilename = "CroatiaHungaryCD.txt";
-	std::ofstream CroatiaHungaryCDfile;
-	CroatiaHungaryCDfile.open(CroatiaHungaryCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungaryCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungaryfilename;
-	CroatiaHungaryfilename = "CroatiaHungaryEM.txt";
-	std::ofstream CroatiaHungaryfile;
-	CroatiaHungaryfile.open(CroatiaHungaryfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungaryfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary _0_14 EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungary_0_14filename;
-	CroatiaHungary_0_14filename = "CroatiaHungary_0_14EM.txt";
-	std::ofstream CroatiaHungary_0_14file;
-	CroatiaHungary_0_14file.open(CroatiaHungary_0_14filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungary_0_14file << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_0_14interpolated[d] << "\t" << HUNexcessmortalitypscore_0_14interpolated[d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary _15_64 EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungary_15_64filename;
-	CroatiaHungary_15_64filename = "CroatiaHungary_15_64EM.txt";
-	std::ofstream CroatiaHungary_15_64file;
-	CroatiaHungary_15_64file.open(CroatiaHungary_15_64filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungary_15_64file << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_15_64interpolated[d] << "\t" << HUNexcessmortalitypscore_15_64interpolated[d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary _65_74 EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungary_65_74filename;
-	CroatiaHungary_65_74filename = "CroatiaHungary_65_74EM.txt";
-	std::ofstream CroatiaHungary_65_74file;
-	CroatiaHungary_65_74file.open(CroatiaHungary_65_74filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungary_65_74file << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_65_74interpolated[d] << "\t" << HUNexcessmortalitypscore_65_74interpolated[d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary _75_84 EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungary_75_84filename;
-	CroatiaHungary_75_84filename = "CroatiaHungary_75_84EM.txt";
-	std::ofstream CroatiaHungary_75_84file;
-	CroatiaHungary_75_84file.open(CroatiaHungary_75_84filename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungary_75_84file << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_75_84interpolated[d] << "\t" << HUNexcessmortalitypscore_75_84interpolated[d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Croatia vs Hungary _85p EM
-	ci1 = CountryIndex(code, "HRV");
-	ci2 = CountryIndex(code, "HUN");
-	std::string CroatiaHungary_85pfilename;
-	CroatiaHungary_85pfilename = "CroatiaHungary_85pEM.txt";
-	std::ofstream CroatiaHungary_85pfile;
-	CroatiaHungary_85pfile.open(CroatiaHungary_85pfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CroatiaHungary_85pfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << HRVexcessmortalitypscore_85pinterpolated[d] << "\t" << HUNexcessmortalitypscore_85pinterpolated[d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Cuba vs Jamaica CD
-	ci1 = CountryIndex(code, "CUB");
-	ci2 = CountryIndex(code, "JAM");
-	std::string CubaJamaicaCDfilename;
-	CubaJamaicaCDfilename = "CubaJamaicaCD.txt";
-	std::ofstream CubaJamaicaCDfile;
-	CubaJamaicaCDfile.open(CubaJamaicaCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CubaJamaicaCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Cuba vs Jamaica EM
-	ci1 = CountryIndex(code, "CUB");
-	ci2 = CountryIndex(code, "JAM");
-	std::string CubaJamaicafilename;
-	CubaJamaicafilename = "CubaJamaicaEM.txt";
-	std::ofstream CubaJamaicafile;
-	CubaJamaicafile.open(CubaJamaicafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CubaJamaicafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Cuba vs Saint Vincent and the Grenadines EM
-	ci1 = CountryIndex(code, "CUB");
-	ci2 = CountryIndex(code, "VCT");
-	std::string CubaSaintVincentandtheGrenadinesfilename;
-	CubaSaintVincentandtheGrenadinesfilename = "CubaSaintVincentandtheGrenadinesEM.txt";
-	std::ofstream CubaSaintVincentandtheGrenadinesfile;
-	CubaSaintVincentandtheGrenadinesfile.open(CubaSaintVincentandtheGrenadinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		CubaSaintVincentandtheGrenadinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Denmark vs Finland EM
-	ci1 = CountryIndex(code, "DNK");
-	ci2 = CountryIndex(code, "FIN");
-	std::string DenmarkFinlandfilename;
-	DenmarkFinlandfilename = "DenmarkFinlandEM.txt";
-	std::ofstream DenmarkFinlandfile;
-	DenmarkFinlandfile.open(DenmarkFinlandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		DenmarkFinlandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Denmark vs Germany EM
-	ci1 = CountryIndex(code, "DNK");
-	ci2 = CountryIndex(code, "DEU");
-	std::string DenmarkGermanyfilename;
-	DenmarkGermanyfilename = "DenmarkGermanyEM.txt";
-	std::ofstream DenmarkGermanyfile;
-	DenmarkGermanyfile.open(DenmarkGermanyfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		DenmarkGermanyfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Denmark vs Norway CD
-	ci1 = CountryIndex(code, "DNK");
-	ci2 = CountryIndex(code, "NOR");
-	std::string DenmarkNorwayCDfilename;
-	DenmarkNorwayCDfilename = "DenmarkNorwayCD.txt";
-	std::ofstream DenmarkNorwayCDfile;
-	DenmarkNorwayCDfile.open(DenmarkNorwayCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		DenmarkNorwayCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Denmark vs Norway EM
-	ci1 = CountryIndex(code, "DNK");
-	ci2 = CountryIndex(code, "NOR");
-	std::string DenmarkNorwayfilename;
-	DenmarkNorwayfilename = "DenmarkNorwayEM.txt";
-	std::ofstream DenmarkNorwayfile;
-	DenmarkNorwayfile.open(DenmarkNorwayfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		DenmarkNorwayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Dominican Republic vs Haiti CD
-	ci1 = CountryIndex(code, "DOM");
-	ci2 = CountryIndex(code, "HTI");
-	std::string DominicanRepublicHaiticdfilename;
-	DominicanRepublicHaiticdfilename = "DominicanRepublicHaitiCD.txt";
-	std::ofstream DominicanRepublicHaiticdfile;
-	DominicanRepublicHaiticdfile.open(DominicanRepublicHaiticdfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		DominicanRepublicHaiticdfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// FaroeIslands vs Norway CD
-	ci1 = CountryIndex(code, "FRO");
-	ci2 = CountryIndex(code, "NOR");
-	std::string FaroeIslandsNorwayCDfilename;
-	FaroeIslandsNorwayCDfilename = "FaroeIslandsNorwayCD.txt";
-	std::ofstream FaroeIslandsNorwayCDfile;
-	FaroeIslandsNorwayCDfile.open(FaroeIslandsNorwayCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		FaroeIslandsNorwayCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// FaroeIslands vs Norway EM
-	ci1 = CountryIndex(code, "FRO");
-	ci2 = CountryIndex(code, "NOR");
-	std::string FaroeIslandsNorwayfilename;
-	FaroeIslandsNorwayfilename = "FaroeIslandsNorwayEM.txt";
-	std::ofstream FaroeIslandsNorwayfile;
-	FaroeIslandsNorwayfile.open(FaroeIslandsNorwayfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		FaroeIslandsNorwayfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// French Polynesia vs New Zealand EM
-	ci1 = CountryIndex(code, "PYF");
-	ci2 = CountryIndex(code, "NZL");
-	std::string FrenchPolynesiaNewZealandfilename;
-	FrenchPolynesiaNewZealandfilename = "FrenchPolynesiaNewZealandEM.txt";
-	std::ofstream FrenchPolynesiaNewZealandfile;
-	FrenchPolynesiaNewZealandfile.open(FrenchPolynesiaNewZealandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		FrenchPolynesiaNewZealandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Gibraltar vs India CD
-	ci1 = CountryIndex(code, "GIB");
-	ci2 = CountryIndex(code, "IND");
-	std::string GibraltarIndiafilename;
-	GibraltarIndiafilename = "GibraltarIndiaCD.txt";
-	std::ofstream GibraltarIndiafile;
-	GibraltarIndiafile.open(GibraltarIndiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		GibraltarIndiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Greece vs Serbia EM
-	ci1 = CountryIndex(code, "GRC");
-	ci2 = CountryIndex(code, "SRB");
-	std::string GreeceSerbiafilename;
-	GreeceSerbiafilename = "GreeceSerbiaEM.txt";
-	std::ofstream GreeceSerbiafile;
-	GreeceSerbiafile.open(GreeceSerbiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		GreeceSerbiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hong Kong vs Macao EM
-	ci1 = CountryIndex(code, "HKG");
-	ci2 = CountryIndex(code, "MAC");
-	std::string HongKongMacaofilename;
-	HongKongMacaofilename = "HongKongMacaoEM.txt";
-	std::ofstream HongKongMacaofile;
-	HongKongMacaofile.open(HongKongMacaofilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HongKongMacaofile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hong Kong vs Philippines CD
-	ci1 = CountryIndex(code, "HKG");
-	ci2 = CountryIndex(code, "PHL");
-	std::string HongKongPhilippinesCDfilename;
-	HongKongPhilippinesCDfilename = "HongKongPhilippinesCD.txt";
-	std::ofstream HongKongPhilippinesCDfile;
-	HongKongPhilippinesCDfile.open(HongKongPhilippinesCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HongKongPhilippinesCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hong Kong vs Philippines EM
-	ci1 = CountryIndex(code, "HKG");
-	ci2 = CountryIndex(code, "PHL");
-	std::string HongKongPhilippinesfilename;
-	HongKongPhilippinesfilename = "HongKongPhilippinesEM.txt";
-	std::ofstream HongKongPhilippinesfile;
-	HongKongPhilippinesfile.open(HongKongPhilippinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HongKongPhilippinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hong Kong vs South Korea EM
-	ci1 = CountryIndex(code, "HKG");
-	ci2 = CountryIndex(code, "KOR");
-	std::string HongKongSouthKoreafilename;
-	HongKongSouthKoreafilename = "HongKongSouthKoreaEM.txt";
-	std::ofstream HongKongSouthKoreafile;
-	HongKongSouthKoreafile.open(HongKongSouthKoreafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HongKongSouthKoreafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hungary vs Romania CD
-	ci1 = CountryIndex(code, "HUN");
-	ci2 = CountryIndex(code, "ROU");
-	std::string HungaryRomaniaCDfilename;
-	HungaryRomaniaCDfilename = "HungaryRomaniaCD.txt";
-	std::ofstream HungaryRomaniaCDfile;
-	HungaryRomaniaCDfile.open(HungaryRomaniaCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HungaryRomaniaCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Hungary vs Romania EM
-	ci1 = CountryIndex(code, "HUN");
-	ci2 = CountryIndex(code, "ROU");
-	std::string HungaryRomaniafilename;
-	HungaryRomaniafilename = "HungaryRomaniaEM.txt";
-	std::ofstream HungaryRomaniafile;
-	HungaryRomaniafile.open(HungaryRomaniafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		HungaryRomaniafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Indonesia vs Philippines CD
-	ci1 = CountryIndex(code, "IDN");
-	ci2 = CountryIndex(code, "PHL");
-	std::string IndonesiaPhilippinesfilename;
-	IndonesiaPhilippinesfilename = "IndonesiaPhilippinesCD.txt";
-	std::ofstream IndonesiaPhilippinesfile;
-	IndonesiaPhilippinesfile.open(IndonesiaPhilippinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		IndonesiaPhilippinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Iran vs Iraq CD
-	ci1 = CountryIndex(code, "IRN");
-	ci2 = CountryIndex(code, "IRQ");
-	std::string IranIraqfilename;
-	IranIraqfilename = "IranIraqCD.txt";
-	std::ofstream IranIraqfile;
-	IranIraqfile.open(IranIraqfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		IranIraqfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Iraq vs Oman CD
-	ci1 = CountryIndex(code, "IRQ");
-	ci2 = CountryIndex(code, "OMN");
-	std::string IraqOmanfilename;
-	IraqOmanfilename = "IraqOmanCD.txt";
-	std::ofstream IraqOmanfile;
-	IraqOmanfile.open(IraqOmanfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		IraqOmanfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Jamaica vs Saint Vincent and the Grenadines CD
-	ci1 = CountryIndex(code, "JAM");
-	ci2 = CountryIndex(code, "VCT");
-	std::string JamaicaSaintVincentandtheGrenadinesCDfilename;
-	JamaicaSaintVincentandtheGrenadinesCDfilename = "JamaicaSaintVincentandtheGrenadinesCD.txt";
-	std::ofstream JamaicaSaintVincentandtheGrenadinesCDfile;
-	JamaicaSaintVincentandtheGrenadinesCDfile.open(JamaicaSaintVincentandtheGrenadinesCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		JamaicaSaintVincentandtheGrenadinesCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Jamaica vs Saint Vincent and the Grenadines EM
-	ci1 = CountryIndex(code, "JAM");
-	ci2 = CountryIndex(code, "VCT");
-	std::string JamaicaSaintVincentandtheGrenadinesfilename;
-	JamaicaSaintVincentandtheGrenadinesfilename = "JamaicaSaintVincentandtheGrenadinesEM.txt";
-	std::ofstream JamaicaSaintVincentandtheGrenadinesfile;
-	JamaicaSaintVincentandtheGrenadinesfile.open(JamaicaSaintVincentandtheGrenadinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		JamaicaSaintVincentandtheGrenadinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Japan vs Malaysia EM
-	ci1 = CountryIndex(code, "JPN");
-	ci2 = CountryIndex(code, "MYS");
-	std::string JapanMalaysiafilename;
-	JapanMalaysiafilename = "JapanMalaysiaEM.txt";
-	std::ofstream JapanMalaysiafile;
-	JapanMalaysiafile.open(JapanMalaysiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		JapanMalaysiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Japan vs Philippines EM
-	ci1 = CountryIndex(code, "JPN");
-	ci2 = CountryIndex(code, "PHL");
-	std::string JapanPhilippinesfilename;
-	JapanPhilippinesfilename = "JapanPhilippinesEM.txt";
-	std::ofstream JapanPhilippinesfile;
-	JapanPhilippinesfile.open(JapanPhilippinesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		JapanPhilippinesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Japan vs South Korea EM
-	ci1 = CountryIndex(code, "JPN");
-	ci2 = CountryIndex(code, "KOR");
-	std::string JapanSouthKoreafilename;
-	JapanSouthKoreafilename = "JapanSouthKoreaEM.txt";
-	std::ofstream JapanSouthKoreafile;
-	JapanSouthKoreafile.open(JapanSouthKoreafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		JapanSouthKoreafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Kyrgyzstan vs Uzbekistan CD
-	ci1 = CountryIndex(code, "KGZ");
-	ci2 = CountryIndex(code, "UZB");
-	std::string KyrgyzstanUzbekistanCDfilename;
-	KyrgyzstanUzbekistanCDfilename = "KyrgyzstanUzbekistanCD.txt";
-	std::ofstream KyrgyzstanUzbekistanCDfile;
-	KyrgyzstanUzbekistanCDfile.open(KyrgyzstanUzbekistanCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		KyrgyzstanUzbekistanCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Kyrgyzstan vs Uzbekistan EM
-	ci1 = CountryIndex(code, "KGZ");
-	ci2 = CountryIndex(code, "UZB");
-	std::string KyrgyzstanUzbekistanfilename;
-	KyrgyzstanUzbekistanfilename = "KyrgyzstanUzbekistanEM.txt";
-	std::ofstream KyrgyzstanUzbekistanfile;
-	KyrgyzstanUzbekistanfile.open(KyrgyzstanUzbekistanfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		KyrgyzstanUzbekistanfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Latvia vs Ukraine CD
-	ci1 = CountryIndex(code, "LVA");
-	ci2 = CountryIndex(code, "UKR");
-	std::string LatviaUkraineCDfilename;
-	LatviaUkraineCDfilename = "LatviaUkraineCD.txt";
-	std::ofstream LatviaUkraineCDfile;
-	LatviaUkraineCDfile.open(LatviaUkraineCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		LatviaUkraineCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Latvia vs Ukraine EM
-	ci1 = CountryIndex(code, "LVA");
-	ci2 = CountryIndex(code, "UKR");
-	std::string LatviaUkrainefilename;
-	LatviaUkrainefilename = "LatviaUkraineEM.txt";
-	std::ofstream LatviaUkrainefile;
-	LatviaUkrainefile.open(LatviaUkrainefilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		LatviaUkrainefile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Lebanon vs Palestine EM
-	ci1 = CountryIndex(code, "LBN");
-	ci2 = CountryIndex(code, "PSE");
-	std::string LebanonPalestinefilename;
-	LebanonPalestinefilename = "LebanonPalestineEM.txt";
-	std::ofstream LebanonPalestinefile;
-	LebanonPalestinefile.open(LebanonPalestinefilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		LebanonPalestinefile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Malaysia vs Mongolia EM
-	ci1 = CountryIndex(code, "MYS");
-	ci2 = CountryIndex(code, "MNG");
-	std::string MalaysiaMongoliafilename;
-	MalaysiaMongoliafilename = "MalaysiaMongoliaEM.txt";
-	std::ofstream MalaysiaMongoliafile;
-	MalaysiaMongoliafile.open(MalaysiaMongoliafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MalaysiaMongoliafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Malaysia vs Taiwan EM
-	ci1 = CountryIndex(code, "MYS");
-	ci2 = CountryIndex(code, "TWN");
-	std::string MalaysiaTaiwanfilename;
-	MalaysiaTaiwanfilename = "MalaysiaTaiwanEM.txt";
-	std::ofstream MalaysiaTaiwanfile;
-	MalaysiaTaiwanfile.open(MalaysiaTaiwanfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MalaysiaTaiwanfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Malaysia vs Thailand CD
-	ci1 = CountryIndex(code, "MYS");
-	ci2 = CountryIndex(code, "THA");
-	std::string MalaysiaThailandCDfilename;
-	MalaysiaThailandCDfilename = "MalaysiaThailandCD.txt";
-	std::ofstream MalaysiaThailandCDfile;
-	MalaysiaThailandCDfile.open(MalaysiaThailandCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MalaysiaThailandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Malaysia vs Thailand EM
-	ci1 = CountryIndex(code, "MYS");
-	ci2 = CountryIndex(code, "THA");
-	std::string MalaysiaThailandfilename;
-	MalaysiaThailandfilename = "MalaysiaThailandEM.txt";
-	std::ofstream MalaysiaThailandfile;
-	MalaysiaThailandfile.open(MalaysiaThailandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MalaysiaThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Mauritius vs Seychelles CD
-	ci1 = CountryIndex(code, "MUS");
-	ci2 = CountryIndex(code, "SYC");
-	std::string MauritiusSeychellesCDfilename;
-	MauritiusSeychellesCDfilename = "MauritiusSeychellesCD.txt";
-	std::ofstream MauritiusSeychellesCDfile;
-	MauritiusSeychellesCDfile.open(MauritiusSeychellesCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MauritiusSeychellesCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Mauritius vs Seychelles EM
-	ci1 = CountryIndex(code, "MUS");
-	ci2 = CountryIndex(code, "SYC");
-	std::string MauritiusSeychellesfilename;
-	MauritiusSeychellesfilename = "MauritiusSeychellesEM.txt";
-	std::ofstream MauritiusSeychellesfile;
-	MauritiusSeychellesfile.open(MauritiusSeychellesfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MauritiusSeychellesfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Mongolia vs Thailand CD
-	ci1 = CountryIndex(code, "MNG");
-	ci2 = CountryIndex(code, "THA");
-	std::string MongoliaThailandCDfilename;
-	MongoliaThailandCDfilename = "MongoliaThailandCD.txt";
-	std::ofstream MongoliaThailandCDfile;
-	MongoliaThailandCDfile.open(MongoliaThailandCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MongoliaThailandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Mongolia vs Thailand EM
-	ci1 = CountryIndex(code, "MNG");
-	ci2 = CountryIndex(code, "THA");
-	std::string MongoliaThailandfilename;
-	MongoliaThailandfilename = "MongoliaThailandEM.txt";
-	std::ofstream MongoliaThailandfile;
-	MongoliaThailandfile.open(MongoliaThailandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		MongoliaThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Papua New Guinea vs Solomon Islands CD
-	ci1 = CountryIndex(code, "PNG");
-	ci2 = CountryIndex(code, "SLB");
-	std::string PapuaNewGuineaSolomonIslandsCDfilename;
-	PapuaNewGuineaSolomonIslandsCDfilename = "PapuaNewGuineaSolomonIslandsCD.txt";
-	std::ofstream PapuaNewGuineaSolomonIslandsCDfile;
-	PapuaNewGuineaSolomonIslandsCDfile.open(PapuaNewGuineaSolomonIslandsCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		PapuaNewGuineaSolomonIslandsCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Philippines vs South Korea EM
-	ci1 = CountryIndex(code, "PHL");
-	ci2 = CountryIndex(code, "KOR");
-	std::string PhilippinesSouthKoreafilename;
-	PhilippinesSouthKoreafilename = "PhilippinesSouthKoreaEM.txt";
-	std::ofstream PhilippinesSouthKoreafile;
-	PhilippinesSouthKoreafile.open(PhilippinesSouthKoreafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		PhilippinesSouthKoreafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Romania vs Russia CD
-	ci1 = CountryIndex(code, "ROU");
-	ci2 = CountryIndex(code, "RUS");
-	std::string RomaniaRussiaCDfilename;
-	RomaniaRussiaCDfilename = "RomaniaRussiaCD.txt";
-	std::ofstream RomaniaRussiaCDfile;
-	RomaniaRussiaCDfile.open(RomaniaRussiaCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		RomaniaRussiaCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Romania vs Russia EM
-	ci1 = CountryIndex(code, "ROU");
-	ci2 = CountryIndex(code, "RUS");
-	std::string RomaniaRussiafilename;
-	RomaniaRussiafilename = "RomaniaRussiaEM.txt";
-	std::ofstream RomaniaRussiafile;
-	RomaniaRussiafile.open(RomaniaRussiafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		RomaniaRussiafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Rwanda vs Uganda CD
-	ci1 = CountryIndex(code, "RWA");
-	ci2 = CountryIndex(code, "UGA");
-	std::string RwandaUgandafilename;
-	RwandaUgandafilename = "RwandaUgandaCD.txt";
-	std::ofstream RwandaUgandafile;
-	RwandaUgandafile.open(RwandaUgandafilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		RwandaUgandafile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Seychelles vs Tanzania CD
-	ci1 = CountryIndex(code, "SYC");
-	ci2 = CountryIndex(code, "TZA");
-	std::string SeychellesTanzaniaCDfilename;
-	SeychellesTanzaniaCDfilename = "SeychellesTanzaniaCD.txt";
-	std::ofstream SeychellesTanzaniaCDfile;
-	SeychellesTanzaniaCDfile.open(SeychellesTanzaniaCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		SeychellesTanzaniaCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Singapore vs Thailand CD
-	ci1 = CountryIndex(code, "SGP");
-	ci2 = CountryIndex(code, "THA");
-	std::string SingaporeThailandCDfilename;
-	SingaporeThailandCDfilename = "SingaporeThailandCD.txt";
-	std::ofstream SingaporeThailandCDfile;
-	SingaporeThailandCDfile.open(SingaporeThailandCDfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		SingaporeThailandCDfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Singapore vs Thailand EM
-	ci1 = CountryIndex(code, "SGP");
-	ci2 = CountryIndex(code, "THA");
-	std::string SingaporeThailandfilename;
-	SingaporeThailandfilename = "SingaporeThailandEM.txt";
-	std::ofstream SingaporeThailandfile;
-	SingaporeThailandfile.open(SingaporeThailandfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		SingaporeThailandfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Sweden vs United Kingdom lockdown
-	ci1 = CountryIndex(code, "SWE");
-	ci2 = CountryIndex(code, "GBR");
-	std::string SWEGBRfilename;
-		SWEGBRfilename = "SWEGBR.txt";
-	std::ofstream SWEGBRfile;
-	SWEGBRfile.open(SWEGBRfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		SWEGBRfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << lockdown[ci1][d] << "\t" << lockdown[ci2][d] << "\t" << excessmortalitypscoreinterpolated[ci1][d] << "\t" << excessmortalitypscoreinterpolated[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Thailand vs Vietnam CD
-	ci1 = CountryIndex(code, "THA");
-	ci2 = CountryIndex(code, "VNM");
-	std::string ThailandVietnamfilename;
-	ThailandVietnamfilename = "ThailandVietnamCD.txt";
-	std::ofstream ThailandVietnamfile;
-	ThailandVietnamfile.open(ThailandVietnamfilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		ThailandVietnamfile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-	// Zambia vs Zimbabwe CD
-	ci1 = CountryIndex(code, "ZMB");
-	ci2 = CountryIndex(code, "ZWE");
-	std::string ZambiaZimbabwefilename;
-	ZambiaZimbabwefilename = "ZambiaZimbabweCD.txt";
-	std::ofstream ZambiaZimbabwefile;
-	ZambiaZimbabwefile.open(ZambiaZimbabwefilename);
-	for (unsigned int d = 0; d < numdates; d++) {
-		date_duration dd(d);
-		date d2 = firstdate + dd;
-		if (d2.day() < 10)
-			dp = "0";
-		else
-			dp = "";
-		if (d2.month() < 10)
-			mp = "0";
-		else
-			mp = "";
-		ZambiaZimbabwefile << dp << d2.day() << "/" << mp << d2.month().as_number() << "/" << d2.year() << "\t" << vaccinations[ci1][d] << "\t" << vaccinations[ci2][d] << "\t" << coviddeaths[ci1][d] << "\t" << coviddeaths[ci2][d] << std::endl;
-	}
-	std::cout << ".";
-
-
-
-
+    // COUNTRY PAIRS: each helper owns and closes one output stream.
+    write_country_pair("AlgeriaEgyptCD.txt", firstdate, vaccinations[CountryIndex(code, "DZA")], vaccinations[CountryIndex(code, "EGY")], coviddeaths[CountryIndex(code, "DZA")], coviddeaths[CountryIndex(code, "EGY")]);
+    write_country_pair("AlgeriaEgyptEM.txt", firstdate, vaccinations[CountryIndex(code, "DZA")], vaccinations[CountryIndex(code, "EGY")], excessmortalitypscoreinterpolated[CountryIndex(code, "DZA")], excessmortalitypscoreinterpolated[CountryIndex(code, "EGY")]);
+    write_country_pair("AntiguaandBarbudaCubaEM.txt", firstdate, vaccinations[CountryIndex(code, "ATG")], vaccinations[CountryIndex(code, "CUB")], excessmortalitypscoreinterpolated[CountryIndex(code, "ATG")], excessmortalitypscoreinterpolated[CountryIndex(code, "CUB")]);
+    write_country_pair("ArgentinaParaguayEM.txt", firstdate, vaccinations[CountryIndex(code, "ARG")], vaccinations[CountryIndex(code, "PRY")], excessmortalitypscoreinterpolated[CountryIndex(code, "ARG")], excessmortalitypscoreinterpolated[CountryIndex(code, "PRY")]);
+    write_country_pair("ArmeniaAzerbaijanCD.txt", firstdate, vaccinations[CountryIndex(code, "ARM")], vaccinations[CountryIndex(code, "AZE")], coviddeaths[CountryIndex(code, "ARM")], coviddeaths[CountryIndex(code, "AZE")]);
+    write_country_pair("ArmeniaAzerbaijanEM.txt", firstdate, vaccinations[CountryIndex(code, "ARM")], vaccinations[CountryIndex(code, "AZE")], excessmortalitypscoreinterpolated[CountryIndex(code, "ARM")], excessmortalitypscoreinterpolated[CountryIndex(code, "AZE")]);
+    write_country_pair("AustraliaFrenchPolynesiaEM.txt", firstdate, vaccinations[CountryIndex(code, "AUS")], vaccinations[CountryIndex(code, "PYF")], excessmortalitypscoreinterpolated[CountryIndex(code, "AUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "PYF")]);
+    write_country_pair("AustraliaNewCaledoniaEM.txt", firstdate, vaccinations[CountryIndex(code, "AUS")], vaccinations[CountryIndex(code, "NCL")], excessmortalitypscoreinterpolated[CountryIndex(code, "AUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "NCL")]);
+    write_country_pair("AustraliaNewZealandCD.txt", firstdate, vaccinations[CountryIndex(code, "AUS")], vaccinations[CountryIndex(code, "NZL")], coviddeaths[CountryIndex(code, "AUS")], coviddeaths[CountryIndex(code, "NZL")]);
+    write_country_pair("AustraliaNewZealandEM.txt", firstdate, vaccinations[CountryIndex(code, "AUS")], vaccinations[CountryIndex(code, "NZL")], excessmortalitypscoreinterpolated[CountryIndex(code, "AUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "NZL")]);
+    write_country_pair("AustraliaMalaysiaEM.txt", firstdate, vaccinations[CountryIndex(code, "AUS")], vaccinations[CountryIndex(code, "MYS")], excessmortalitypscoreinterpolated[CountryIndex(code, "AUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "MYS")]);
+    write_country_pair("BelarusDenmarkCD.txt", firstdate, vaccinations[CountryIndex(code, "BLR")], vaccinations[CountryIndex(code, "DNK")], coviddeaths[CountryIndex(code, "BLR")], coviddeaths[CountryIndex(code, "DNK")]);
+    write_country_pair("BelarusDenmarkEM.txt", firstdate, vaccinations[CountryIndex(code, "BLR")], vaccinations[CountryIndex(code, "DNK")], excessmortalitypscoreinterpolated[CountryIndex(code, "BLR")], excessmortalitypscoreinterpolated[CountryIndex(code, "DNK")]);
+    write_country_pair("BhutanSingaporeCD.txt", firstdate, vaccinations[CountryIndex(code, "BTN")], vaccinations[CountryIndex(code, "SGP")], coviddeaths[CountryIndex(code, "BTN")], coviddeaths[CountryIndex(code, "SGP")]);
+    write_country_pair("BhutanSingaporeEM.txt", firstdate, vaccinations[CountryIndex(code, "BTN")], vaccinations[CountryIndex(code, "SGP")], excessmortalitypscoreinterpolated[CountryIndex(code, "BTN")], excessmortalitypscoreinterpolated[CountryIndex(code, "SGP")]);
+    write_country_pair("BhutanThailandCD.txt", firstdate, vaccinations[CountryIndex(code, "BTN")], vaccinations[CountryIndex(code, "THA")], coviddeaths[CountryIndex(code, "BTN")], coviddeaths[CountryIndex(code, "THA")]);
+    write_country_pair("BhutanThailandEM.txt", firstdate, vaccinations[CountryIndex(code, "BTN")], vaccinations[CountryIndex(code, "THA")], excessmortalitypscoreinterpolated[CountryIndex(code, "BTN")], excessmortalitypscoreinterpolated[CountryIndex(code, "THA")]);
+    write_country_pair("BhutanVietnamCD.txt", firstdate, vaccinations[CountryIndex(code, "BTN")], vaccinations[CountryIndex(code, "VNM")], coviddeaths[CountryIndex(code, "BTN")], coviddeaths[CountryIndex(code, "VNM")]);
+    write_country_pair("BurundiEritreaCD.txt", firstdate, vaccinations[CountryIndex(code, "BDI")], vaccinations[CountryIndex(code, "ERI")], coviddeaths[CountryIndex(code, "BDI")], coviddeaths[CountryIndex(code, "ERI")]);
+    write_country_pair("BosniaandHerzegovinaRomaniaEM.txt", firstdate, vaccinations[CountryIndex(code, "BIH")], vaccinations[CountryIndex(code, "ROU")], excessmortalitypscoreinterpolated[CountryIndex(code, "BIH")], excessmortalitypscoreinterpolated[CountryIndex(code, "ROU")]);
+    write_country_pair("BulgariaSerbiaEM.txt", firstdate, vaccinations[CountryIndex(code, "BGR")], vaccinations[CountryIndex(code, "SRB")], excessmortalitypscoreinterpolated[CountryIndex(code, "BGR")], excessmortalitypscoreinterpolated[CountryIndex(code, "SRB")]);
+    write_country_pair("BurundiSeychellesCD.txt", firstdate, vaccinations[CountryIndex(code, "BDI")], vaccinations[CountryIndex(code, "SYC")], coviddeaths[CountryIndex(code, "BDI")], coviddeaths[CountryIndex(code, "SYC")]);
+    write_country_pair("CambodiaVietnamCD.txt", firstdate, vaccinations[CountryIndex(code, "KHM")], vaccinations[CountryIndex(code, "VNM")], coviddeaths[CountryIndex(code, "KHM")], coviddeaths[CountryIndex(code, "VNM")]);
+    write_country_pair("CanadaCubaEM.txt", firstdate, vaccinations[CountryIndex(code, "CAN")], vaccinations[CountryIndex(code, "CUB")], excessmortalitypscoreinterpolated[CountryIndex(code, "CAN")], excessmortalitypscoreinterpolated[CountryIndex(code, "CUB")]);
+    write_country_pair("CanadaSaintVincentandtheGrenadinesEM.txt", firstdate, vaccinations[CountryIndex(code, "CAN")], vaccinations[CountryIndex(code, "VCT")], excessmortalitypscoreinterpolated[CountryIndex(code, "CAN")], excessmortalitypscoreinterpolated[CountryIndex(code, "VCT")]);
+    write_country_pair("CapeVerdeTunisiaEM.txt", firstdate, vaccinations[CountryIndex(code, "CPV")], vaccinations[CountryIndex(code, "TUN")], excessmortalitypscoreinterpolated[CountryIndex(code, "CPV")], excessmortalitypscoreinterpolated[CountryIndex(code, "TUN")]);
+    write_country_pair("CroatiaHungaryCD.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], coviddeaths[CountryIndex(code, "HRV")], coviddeaths[CountryIndex(code, "HUN")]);
+    write_country_pair("CroatiaHungaryEM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], excessmortalitypscoreinterpolated[CountryIndex(code, "HRV")], excessmortalitypscoreinterpolated[CountryIndex(code, "HUN")]);
+    write_country_pair("CroatiaHungary_0_14EM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], HRVexcessmortalitypscore_0_14interpolated, HUNexcessmortalitypscore_0_14interpolated);
+    write_country_pair("CroatiaHungary_15_64EM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], HRVexcessmortalitypscore_15_64interpolated, HUNexcessmortalitypscore_15_64interpolated);
+    write_country_pair("CroatiaHungary_65_74EM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], HRVexcessmortalitypscore_65_74interpolated, HUNexcessmortalitypscore_65_74interpolated);
+    write_country_pair("CroatiaHungary_75_84EM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], HRVexcessmortalitypscore_75_84interpolated, HUNexcessmortalitypscore_75_84interpolated);
+    write_country_pair("CroatiaHungary_85pEM.txt", firstdate, vaccinations[CountryIndex(code, "HRV")], vaccinations[CountryIndex(code, "HUN")], HRVexcessmortalitypscore_85pinterpolated, HUNexcessmortalitypscore_85pinterpolated);
+    write_country_pair("CubaJamaicaCD.txt", firstdate, vaccinations[CountryIndex(code, "CUB")], vaccinations[CountryIndex(code, "JAM")], coviddeaths[CountryIndex(code, "CUB")], coviddeaths[CountryIndex(code, "JAM")]);
+    write_country_pair("CubaJamaicaEM.txt", firstdate, vaccinations[CountryIndex(code, "CUB")], vaccinations[CountryIndex(code, "JAM")], excessmortalitypscoreinterpolated[CountryIndex(code, "CUB")], excessmortalitypscoreinterpolated[CountryIndex(code, "JAM")]);
+    write_country_pair("CubaSaintVincentandtheGrenadinesEM.txt", firstdate, vaccinations[CountryIndex(code, "CUB")], vaccinations[CountryIndex(code, "VCT")], excessmortalitypscoreinterpolated[CountryIndex(code, "CUB")], excessmortalitypscoreinterpolated[CountryIndex(code, "VCT")]);
+    write_country_pair("DenmarkFinlandEM.txt", firstdate, vaccinations[CountryIndex(code, "DNK")], vaccinations[CountryIndex(code, "FIN")], excessmortalitypscoreinterpolated[CountryIndex(code, "DNK")], excessmortalitypscoreinterpolated[CountryIndex(code, "FIN")]);
+    write_country_pair("DenmarkGermanyEM.txt", firstdate, vaccinations[CountryIndex(code, "DNK")], vaccinations[CountryIndex(code, "DEU")], excessmortalitypscoreinterpolated[CountryIndex(code, "DNK")], excessmortalitypscoreinterpolated[CountryIndex(code, "DEU")]);
+    write_country_pair("DenmarkNorwayCD.txt", firstdate, vaccinations[CountryIndex(code, "DNK")], vaccinations[CountryIndex(code, "NOR")], coviddeaths[CountryIndex(code, "DNK")], coviddeaths[CountryIndex(code, "NOR")]);
+    write_country_pair("DenmarkNorwayEM.txt", firstdate, vaccinations[CountryIndex(code, "DNK")], vaccinations[CountryIndex(code, "NOR")], excessmortalitypscoreinterpolated[CountryIndex(code, "DNK")], excessmortalitypscoreinterpolated[CountryIndex(code, "NOR")]);
+    write_country_pair("DominicanRepublicHaitiCD.txt", firstdate, vaccinations[CountryIndex(code, "DOM")], vaccinations[CountryIndex(code, "HTI")], coviddeaths[CountryIndex(code, "DOM")], coviddeaths[CountryIndex(code, "HTI")]);
+    write_country_pair("FaroeIslandsNorwayCD.txt", firstdate, vaccinations[CountryIndex(code, "FRO")], vaccinations[CountryIndex(code, "NOR")], coviddeaths[CountryIndex(code, "FRO")], coviddeaths[CountryIndex(code, "NOR")]);
+    write_country_pair("FaroeIslandsNorwayEM.txt", firstdate, vaccinations[CountryIndex(code, "FRO")], vaccinations[CountryIndex(code, "NOR")], excessmortalitypscoreinterpolated[CountryIndex(code, "FRO")], excessmortalitypscoreinterpolated[CountryIndex(code, "NOR")]);
+    write_country_pair("FrenchPolynesiaNewZealandEM.txt", firstdate, vaccinations[CountryIndex(code, "PYF")], vaccinations[CountryIndex(code, "NZL")], excessmortalitypscoreinterpolated[CountryIndex(code, "PYF")], excessmortalitypscoreinterpolated[CountryIndex(code, "NZL")]);
+    write_country_pair("GibraltarIndiaCD.txt", firstdate, vaccinations[CountryIndex(code, "GIB")], vaccinations[CountryIndex(code, "IND")], coviddeaths[CountryIndex(code, "GIB")], coviddeaths[CountryIndex(code, "IND")]);
+    write_country_pair("GreeceSerbiaEM.txt", firstdate, vaccinations[CountryIndex(code, "GRC")], vaccinations[CountryIndex(code, "SRB")], excessmortalitypscoreinterpolated[CountryIndex(code, "GRC")], excessmortalitypscoreinterpolated[CountryIndex(code, "SRB")]);
+    write_country_pair("HongKongMacaoEM.txt", firstdate, vaccinations[CountryIndex(code, "HKG")], vaccinations[CountryIndex(code, "MAC")], excessmortalitypscoreinterpolated[CountryIndex(code, "HKG")], excessmortalitypscoreinterpolated[CountryIndex(code, "MAC")]);
+    write_country_pair("HongKongPhilippinesCD.txt", firstdate, vaccinations[CountryIndex(code, "HKG")], vaccinations[CountryIndex(code, "PHL")], coviddeaths[CountryIndex(code, "HKG")], coviddeaths[CountryIndex(code, "PHL")]);
+    write_country_pair("HongKongPhilippinesEM.txt", firstdate, vaccinations[CountryIndex(code, "HKG")], vaccinations[CountryIndex(code, "PHL")], excessmortalitypscoreinterpolated[CountryIndex(code, "HKG")], excessmortalitypscoreinterpolated[CountryIndex(code, "PHL")]);
+    write_country_pair("HongKongSouthKoreaEM.txt", firstdate, vaccinations[CountryIndex(code, "HKG")], vaccinations[CountryIndex(code, "KOR")], excessmortalitypscoreinterpolated[CountryIndex(code, "HKG")], excessmortalitypscoreinterpolated[CountryIndex(code, "KOR")]);
+    write_country_pair("HungaryRomaniaCD.txt", firstdate, vaccinations[CountryIndex(code, "HUN")], vaccinations[CountryIndex(code, "ROU")], coviddeaths[CountryIndex(code, "HUN")], coviddeaths[CountryIndex(code, "ROU")]);
+    write_country_pair("HungaryRomaniaEM.txt", firstdate, vaccinations[CountryIndex(code, "HUN")], vaccinations[CountryIndex(code, "ROU")], excessmortalitypscoreinterpolated[CountryIndex(code, "HUN")], excessmortalitypscoreinterpolated[CountryIndex(code, "ROU")]);
+    write_country_pair("IndonesiaPhilippinesCD.txt", firstdate, vaccinations[CountryIndex(code, "IDN")], vaccinations[CountryIndex(code, "PHL")], coviddeaths[CountryIndex(code, "IDN")], coviddeaths[CountryIndex(code, "PHL")]);
+    write_country_pair("IranIraqCD.txt", firstdate, vaccinations[CountryIndex(code, "IRN")], vaccinations[CountryIndex(code, "IRQ")], coviddeaths[CountryIndex(code, "IRN")], coviddeaths[CountryIndex(code, "IRQ")]);
+    write_country_pair("IraqOmanCD.txt", firstdate, vaccinations[CountryIndex(code, "IRQ")], vaccinations[CountryIndex(code, "OMN")], coviddeaths[CountryIndex(code, "IRQ")], coviddeaths[CountryIndex(code, "OMN")]);
+    write_country_pair("JamaicaSaintVincentandtheGrenadinesCD.txt", firstdate, vaccinations[CountryIndex(code, "JAM")], vaccinations[CountryIndex(code, "VCT")], coviddeaths[CountryIndex(code, "JAM")], coviddeaths[CountryIndex(code, "VCT")]);
+    write_country_pair("JamaicaSaintVincentandtheGrenadinesEM.txt", firstdate, vaccinations[CountryIndex(code, "JAM")], vaccinations[CountryIndex(code, "VCT")], excessmortalitypscoreinterpolated[CountryIndex(code, "JAM")], excessmortalitypscoreinterpolated[CountryIndex(code, "VCT")]);
+    write_country_pair("JapanMalaysiaEM.txt", firstdate, vaccinations[CountryIndex(code, "JPN")], vaccinations[CountryIndex(code, "MYS")], excessmortalitypscoreinterpolated[CountryIndex(code, "JPN")], excessmortalitypscoreinterpolated[CountryIndex(code, "MYS")]);
+    write_country_pair("JapanPhilippinesEM.txt", firstdate, vaccinations[CountryIndex(code, "JPN")], vaccinations[CountryIndex(code, "PHL")], excessmortalitypscoreinterpolated[CountryIndex(code, "JPN")], excessmortalitypscoreinterpolated[CountryIndex(code, "PHL")]);
+    write_country_pair("JapanSouthKoreaEM.txt", firstdate, vaccinations[CountryIndex(code, "JPN")], vaccinations[CountryIndex(code, "KOR")], excessmortalitypscoreinterpolated[CountryIndex(code, "JPN")], excessmortalitypscoreinterpolated[CountryIndex(code, "KOR")]);
+    write_country_pair("KyrgyzstanUzbekistanCD.txt", firstdate, vaccinations[CountryIndex(code, "KGZ")], vaccinations[CountryIndex(code, "UZB")], coviddeaths[CountryIndex(code, "KGZ")], coviddeaths[CountryIndex(code, "UZB")]);
+    write_country_pair("KyrgyzstanUzbekistanEM.txt", firstdate, vaccinations[CountryIndex(code, "KGZ")], vaccinations[CountryIndex(code, "UZB")], excessmortalitypscoreinterpolated[CountryIndex(code, "KGZ")], excessmortalitypscoreinterpolated[CountryIndex(code, "UZB")]);
+    write_country_pair("LatviaUkraineCD.txt", firstdate, vaccinations[CountryIndex(code, "LVA")], vaccinations[CountryIndex(code, "UKR")], coviddeaths[CountryIndex(code, "LVA")], coviddeaths[CountryIndex(code, "UKR")]);
+    write_country_pair("LatviaUkraineEM.txt", firstdate, vaccinations[CountryIndex(code, "LVA")], vaccinations[CountryIndex(code, "UKR")], excessmortalitypscoreinterpolated[CountryIndex(code, "LVA")], excessmortalitypscoreinterpolated[CountryIndex(code, "UKR")]);
+    write_country_pair("LebanonPalestineEM.txt", firstdate, vaccinations[CountryIndex(code, "LBN")], vaccinations[CountryIndex(code, "PSE")], excessmortalitypscoreinterpolated[CountryIndex(code, "LBN")], excessmortalitypscoreinterpolated[CountryIndex(code, "PSE")]);
+    write_country_pair("MalaysiaMongoliaEM.txt", firstdate, vaccinations[CountryIndex(code, "MYS")], vaccinations[CountryIndex(code, "MNG")], excessmortalitypscoreinterpolated[CountryIndex(code, "MYS")], excessmortalitypscoreinterpolated[CountryIndex(code, "MNG")]);
+    write_country_pair("MalaysiaTaiwanEM.txt", firstdate, vaccinations[CountryIndex(code, "MYS")], vaccinations[CountryIndex(code, "TWN")], excessmortalitypscoreinterpolated[CountryIndex(code, "MYS")], excessmortalitypscoreinterpolated[CountryIndex(code, "TWN")]);
+    write_country_pair("MalaysiaThailandCD.txt", firstdate, vaccinations[CountryIndex(code, "MYS")], vaccinations[CountryIndex(code, "THA")], coviddeaths[CountryIndex(code, "MYS")], coviddeaths[CountryIndex(code, "THA")]);
+    write_country_pair("MalaysiaThailandEM.txt", firstdate, vaccinations[CountryIndex(code, "MYS")], vaccinations[CountryIndex(code, "THA")], excessmortalitypscoreinterpolated[CountryIndex(code, "MYS")], excessmortalitypscoreinterpolated[CountryIndex(code, "THA")]);
+    write_country_pair("MauritiusSeychellesCD.txt", firstdate, vaccinations[CountryIndex(code, "MUS")], vaccinations[CountryIndex(code, "SYC")], coviddeaths[CountryIndex(code, "MUS")], coviddeaths[CountryIndex(code, "SYC")]);
+    write_country_pair("MauritiusSeychellesEM.txt", firstdate, vaccinations[CountryIndex(code, "MUS")], vaccinations[CountryIndex(code, "SYC")], excessmortalitypscoreinterpolated[CountryIndex(code, "MUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "SYC")]);
+    write_country_pair("MongoliaThailandCD.txt", firstdate, vaccinations[CountryIndex(code, "MNG")], vaccinations[CountryIndex(code, "THA")], coviddeaths[CountryIndex(code, "MNG")], coviddeaths[CountryIndex(code, "THA")]);
+    write_country_pair("MongoliaThailandEM.txt", firstdate, vaccinations[CountryIndex(code, "MNG")], vaccinations[CountryIndex(code, "THA")], excessmortalitypscoreinterpolated[CountryIndex(code, "MNG")], excessmortalitypscoreinterpolated[CountryIndex(code, "THA")]);
+    write_country_pair("PapuaNewGuineaSolomonIslandsCD.txt", firstdate, vaccinations[CountryIndex(code, "PNG")], vaccinations[CountryIndex(code, "SLB")], coviddeaths[CountryIndex(code, "PNG")], coviddeaths[CountryIndex(code, "SLB")]);
+    write_country_pair("PhilippinesSouthKoreaEM.txt", firstdate, vaccinations[CountryIndex(code, "PHL")], vaccinations[CountryIndex(code, "KOR")], excessmortalitypscoreinterpolated[CountryIndex(code, "PHL")], excessmortalitypscoreinterpolated[CountryIndex(code, "KOR")]);
+    write_country_pair("RomaniaRussiaCD.txt", firstdate, vaccinations[CountryIndex(code, "ROU")], vaccinations[CountryIndex(code, "RUS")], coviddeaths[CountryIndex(code, "ROU")], coviddeaths[CountryIndex(code, "RUS")]);
+    write_country_pair("RomaniaRussiaEM.txt", firstdate, vaccinations[CountryIndex(code, "ROU")], vaccinations[CountryIndex(code, "RUS")], excessmortalitypscoreinterpolated[CountryIndex(code, "ROU")], excessmortalitypscoreinterpolated[CountryIndex(code, "RUS")]);
+    write_country_pair("RwandaUgandaCD.txt", firstdate, vaccinations[CountryIndex(code, "RWA")], vaccinations[CountryIndex(code, "UGA")], coviddeaths[CountryIndex(code, "RWA")], coviddeaths[CountryIndex(code, "UGA")]);
+    write_country_pair("SeychellesTanzaniaCD.txt", firstdate, vaccinations[CountryIndex(code, "SYC")], vaccinations[CountryIndex(code, "TZA")], coviddeaths[CountryIndex(code, "SYC")], coviddeaths[CountryIndex(code, "TZA")]);
+    write_country_pair("SingaporeThailandCD.txt", firstdate, vaccinations[CountryIndex(code, "SGP")], vaccinations[CountryIndex(code, "THA")], coviddeaths[CountryIndex(code, "SGP")], coviddeaths[CountryIndex(code, "THA")]);
+    write_country_pair("SingaporeThailandEM.txt", firstdate, vaccinations[CountryIndex(code, "SGP")], vaccinations[CountryIndex(code, "THA")], excessmortalitypscoreinterpolated[CountryIndex(code, "SGP")], excessmortalitypscoreinterpolated[CountryIndex(code, "THA")]);
+    write_country_pair("SWEGBR.txt", firstdate, lockdown[CountryIndex(code, "SWE")], lockdown[CountryIndex(code, "GBR")], excessmortalitypscoreinterpolated[CountryIndex(code, "SWE")], excessmortalitypscoreinterpolated[CountryIndex(code, "GBR")]);
+    write_country_pair("ThailandVietnamCD.txt", firstdate, vaccinations[CountryIndex(code, "THA")], vaccinations[CountryIndex(code, "VNM")], coviddeaths[CountryIndex(code, "THA")], coviddeaths[CountryIndex(code, "VNM")]);
+    write_country_pair("ZambiaZimbabweCD.txt", firstdate, vaccinations[CountryIndex(code, "ZMB")], vaccinations[CountryIndex(code, "ZWE")], coviddeaths[CountryIndex(code, "ZMB")], coviddeaths[CountryIndex(code, "ZWE")]);
+
+#ifndef OWID_SKIP_DTW
 	std::string vaxdiff, cddiff, emdiff;
 
 	for (int c1 = 0; c1 < numentities; c1++)
 		for (int c2 = 0; c2 < numentities; c2++) {
-			// for each pair of countries, c1 and c2
+			// Only compare distinct countries on the same known continent.
+            if (c1 >= c2 || continent[c1].empty() || continent[c1] != continent[c2]) continue;
+            // Legacy DTW coordinates combine days and outcome values. Distances are
+            // arbitrary-unit matching scores, not physical rates or causal effects.
 
 			// compare vaccinations
 			std::vector<std::vector<double> > v1(numdates, std::vector<double>(2));
@@ -6631,7 +2705,7 @@ int main()
 				v2[d1][1] = vaccinations[c2][d1];
 			}
 			for (unsigned int i = 0; i < v1.size(); ) {
-				if (isnan(v1[i][1]) || isnan(v2[i][1])) {
+				if (std::isnan(v1[i][1]) || std::isnan(v2[i][1])) {
 					v1.erase(v1.begin() + i);
 					v2.erase(v2.begin() + i);
 				}
@@ -6649,7 +2723,7 @@ int main()
 				cd2[d1][1] = coviddeaths[c2][d1];
 			}
 			for (unsigned int i = 0; i < cd1.size(); ) {
-				if (isnan(cd1[i][1]) || isnan(cd2[i][1])) {
+				if (std::isnan(cd1[i][1]) || std::isnan(cd2[i][1])) {
 					cd1.erase(cd1.begin() + i);
 					cd2.erase(cd2.begin() + i);
 				}
@@ -6662,12 +2736,12 @@ int main()
 			std::vector<std::vector<double> > em2(numprevaxdates, std::vector<double>(2));
 			for (int d1 = 0; d1 < numprevaxdates; d1++) {
 				em1[d1][0] = d1;
-				em1[d1][1] = excessmortalitypscoreinterpolated[c1][d1];
+				em1[d1][1] = excessmortalitypscoreprevax[c1][d1];
 				em2[d1][0] = d1;
-				em2[d1][1] = excessmortalitypscoreinterpolated[c2][d1];
+				em2[d1][1] = excessmortalitypscoreprevax[c2][d1];
 			}
 			for (unsigned int i = 0; i < em1.size(); ) {
-				if (isnan(em1[i][1]) || isnan(em2[i][1])) {
+				if (std::isnan(em1[i][1]) || std::isnan(em2[i][1])) {
 					em1.erase(em1.begin() + i);
 					em2.erase(em2.begin() + i);
 				}
@@ -6694,19 +2768,26 @@ int main()
 	std::cout << ".";
 
 	std::sort(display.begin(), display.end());
-	outputfile << "Continent" <<  "\t" << "Country1" << "\t" << "Country2" << "\t" << "vax p_norm" << "\t" << "cd p_norm" << "\t" << "em p_norm" << std::endl;
+	outputfile << "Continent" <<  "\t" << "Country1" << "\t" << "Country2" << "\t" << "Vaccination DTW distance (mixed-coordinate arbitrary units)" << "\t" << "COVID-19 DTW distance (mixed-coordinate arbitrary units)" << "\t" << "Excess mortality DTW distance (mixed-coordinate arbitrary units)" << std::endl;
 	for (unsigned int i = 0; i < display.size(); i++)
 		outputfile << display[i] << std::endl;
 
+#else
+    outputfile << "DTW distance calculations were skipped (compiled with OWID_SKIP_DTW).\n";
+    std::cout << "DTW distance calculations skipped; DTW.hpp was not compiled.\n";
+#endif
 	std::cout << std::endl;
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> diff = end - start;
-	double mins = floor(diff.count() / 60);
+	double mins = std::floor(diff.count() / 60);
 	double secs = diff.count() - mins*60;
 	//std::cout << "Elapsed time: " << mins << " minutes " << secs << " seconds" << std::endl;
 	std::cout << "Finished!" << std::endl;
 	std::cout << "5) Copy this program's output files to the directory containing SIR.py." << std::endl;
 	std::cout << "6) Run SIR.py." << std::endl;
-	std::cin.get();
+	if (!use_clusters) std::cin.get();
 	return 0;
+} catch (const std::exception& error) {
+    std::cerr << "Error: " << error.what() << std::endl;
+    return 1;
 }

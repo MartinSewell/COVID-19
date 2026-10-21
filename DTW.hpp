@@ -23,223 +23,169 @@
 //
 
 
-#include <cstdlib>
-#include <vector>
-#include <cmath>
+#ifndef MARTIN_REVIEWED_DTW_HPP_INCLUDED
+#define MARTIN_REVIEWED_DTW_HPP_INCLUDED
+
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <limits>
 #include <stdexcept>
-const std::string DTW_VERSION = "0.0.1";
+#include <string>
+#include <vector>
 
+// Reviewed 21 October 2026. Public names and the accumulated-cost DTW rule
+// are retained. This header is self-contained and safe in multiple .cpp files.
+inline const std::string DTW_VERSION = "0.0.1";
 
-namespace DTW
-{
-  /**
-   * Compute the p_norm between two 1D c++ vectors.
-   *
-   * The p_norm is sometimes referred to as the Minkowski norm. Common 
-   * p_norms include p=2.0 for the euclidean norm, or p=1.0 for the
-   * manhattan distance. See also
-   * https://en.wikipedia.org/wiki/Norm_(mathematics)#p-norm
-   *
-   * @a 1D vector of m size, where m is the number of dimensions.
-   * @b 1D vector of m size (must be the same size as b).
-   * @p value of norm to use.
-   */
-  double p_norm (std::vector<double> a, std::vector<double> b, double p) {
-      double d = 0;
-      for (int i = 0; i < a.size() ; i++) {
-        d += std::pow(std::abs(a[i] - b[i]), p);
-      }
-      return std::pow(d, 1.0/p);
-  };
+namespace DTW {
+using Matrix = std::vector<std::vector<double>>;
 
-  /**
-   * Compute the DTW distance between two 2D c++ vectors.
-   *
-   * The c++ vectors can have different number of data points, but must
-   * have the same number of dimensions. This will raise
-   * std::invalid_argument if the dimmensions of a and b are different.
-   * Here the vectors should be formatted as
-   * [number_of_data_points][number_of_dimensions]. The DTW distance can
-   * be computed for any p_norm. See the wiki for more DTW info.
-   * https://en.wikipedia.org/wiki/Dynamic_time_warping
-   *
-   * @a 2D vector of [number_of_data_points][number_of_dimensions].
-   * @b 2D vector of [number_of_data_points][number_of_dimensions].
-   * @p value of p_norm to use.
-   */
-  double dtw_distance_only(std::vector<std::vector<double>> a,
-                          std::vector<std::vector<double>> b,
-                          double p)
-  {
-    int n = a.size();
-    int o = b.size();
-    int a_m = a[0].size();
-    int b_m = b[0].size();
-    if (a_m != b_m)
-      {
-        throw std::invalid_argument( "a and b must have the same number of dimensions!" );
-      }
-    std::vector<std::vector<double> > d(n, std::vector<double> (o, 0.0));
-    d[0][0] = p_norm(a[0], b[0], p);
-    for (int i=1; i < n; i++)
-      {
-        d[i][0] = d[i-1][0] + p_norm(a[i], b[0], p);
-      }
-    for (int i=1; i < o ; i++)
-      {
-        d[0][i] = d[0][i-1] + p_norm(a[0], b[i], p);
-      }
-    for (int i=1; i < n ; i++)
-      {
-        for (int j=1; j < o; j++){
-          d[i][j] = p_norm(a[i], b[j], p) + std::fmin(std::fmin(d[i-1][j], d[i][j-1]), d[i-1][j-1]);
-        }  
-      }
-    return d[n-1][o-1];
-  };
-
-  /**
-   * Assembles a 2D c++ DTW distance vector.
-   *
-   * The DTW distance vector represents the matrix of DTW distances for
-   * all possible alignments. The c++ vectors must have the same 2D size.
-   * d.size() == c.size() == number of a data points, where d[0].size ==
-   * c[0].size() == number of b data points.
-   *
-   * @d 2D DTW distance vector of [a data points][b data points].
-   * @c 2D pairwise distance vector between every a and b data point.
-   */
-  std::vector<std::vector<double> > dtw_vector_assemble(std::vector<std::vector<double>> d,
-                                                        std::vector<std::vector<double>> c) 
-  {
-    int n = d.size();
-    int o = d[0].size();
-    for (int i=1; i < n; i++)
-      {
-        d[i][0] = d[i-1][0] + c[i][0];
-      }
-    for (int i=1; i < o ; i++)
-      {
-        d[0][i] = d[0][i-1] + c[0][i];
-      }
-    for (int i=1; i < n ; i++)
-      {
-        for (int j=1; j < o; j++){
-          d[i][j] = c[i][j] + std::fmin(std::fmin(d[i-1][j], d[i][j-1]), d[i-1][j-1]);
-        }  
-      }
-    return d;
-  };
-
-
-  class DTW {
-
-  public:
-    std::vector<std::vector<double> > a_vector, b_vector;
-    int a_data, n_dim, b_data;
-    double p, distance;
-    std::vector<std::vector<double> > dtw_vector, pairwise_vector;
-
-    /**
-      * Class for Dynamic Time Warping distance between two 2D c++ vectors.
-      * 
-      * The c++ vectors can have different number of data points, but must
-      * have the same number of dimensions. This will raise
-      * std::invalid_argument if the dimmensions of a and b are different.
-      * Here the vectors should be formatted as
-      * [number_of_data_points][number_of_dimensions]. The DTW distance can
-      * be computed for any p_norm. See the wiki for more DTW info.
-      * https://en.wikipedia.org/wiki/Dynamic_time_warping
-      * 
-      * @a 2D vector of [number_of_data_points][number_of_dimensions].
-      * @b 2D vector of [number_of_data_points][number_of_dimensions].
-      * @p value of p_norm to use.
-      * 
-      * This class stores the following:
-      * 
-      * @DTW.distance Computed DTW distance.
-      * @DTW.pairwise_vector P_norm distance between each a and b data point.
-      * @DTW.dtw_vector DTW distance matrix.
-      * 
-      * The class has the following methods:
-      * 
-      * @DTW.path() Returns a 2D vector of the alignment path between a and b.
-      */
-    DTW (std::vector<std::vector<double> > a, std::vector<std::vector<double> > b, double p) : 
-      a_vector(a), b_vector(b), p(p) {
-        a_data = a.size();
-        b_data = b.size();
-        int a_m = a_vector[0].size();
-        int b_m = b_vector[0].size();
-        
-        if (a_m != b_m)
-        {
-          throw std::invalid_argument( "a and b must have the same number of dimensions!" );
-        }
-        else
-        {
-          n_dim = a_m;
-        }    
-
-        std::vector<std::vector<double> > c(a_data, std::vector<double> (b_data, 0.0));
-
-        for (int i=0; i < a_data; i++){
-          for (int j=0; j < b_data; j++) {
-            c[i][j] = p_norm(a_vector[i], b_vector[j], p);
-          }
-        }
-        pairwise_vector = c;
-        std::vector<std::vector<double> > d(a_data, std::vector<double> (b_data, 0.0));
-        d[0][0] = pairwise_vector[0][0];
-        dtw_vector = dtw_vector_assemble(d, pairwise_vector);
-        distance = dtw_vector[a_data-1][b_data-1];
-      };
-
-    /**
-     * Returns a 2D vector of the alignment path between a and b.
-     *
-     * The DTW path is a 2D integer vector, where [path_length][i] represents
-     * the i'th data point on curve a, and [path_length][j] represents the j'th
-     * data point on curve b. The path_length will depend upon the optimal DTW
-     * alignment.
-     */
-    std::vector<std::vector<int> > path () {
-      int i = a_data - 1;
-      int j = b_data - 1;
-      std::vector<std::vector<int> > my_path = { {i, j} };
-      while (i > 0 || j > 0) {
-        if (i == 0)
-        {
-          j -= 1;
-        }
-        else if (j == 0)
-        {
-          i -= 1;
-        }
-        else
-        {
-          double temp_step = std::fmin(std::fmin(dtw_vector[i-1][j], dtw_vector[i][j-1]),
-                                       dtw_vector[i-1][j-1]);
-          if (temp_step == dtw_vector[i-1][j])
-          {
-            i -= 1;
-          }
-          else if (temp_step == dtw_vector[i][j-1])
-          {
-            j -= 1;
-          }
-          else
-          {
-            i -= 1;
-            j -= 1;
-          }
-        }
-        my_path.push_back ({i, j});
-      }
-      std::reverse(my_path.begin(), my_path.end());
-      return my_path;
-    }
-  };
-
+namespace detail {
+inline void check_p(double p) {
+    if (!std::isfinite(p) || p <= 0.0)
+        throw std::invalid_argument("DTW requires a finite, positive p.");
 }
+inline std::size_t check_matrix(const Matrix& values) {
+    if (values.empty() || values.front().empty())
+        throw std::invalid_argument("DTW requires non-empty sequences and dimensions.");
+    const std::size_t dimensions = values.front().size();
+    for (const auto& row : values) {
+        if (row.size() != dimensions)
+            throw std::invalid_argument("DTW rows must have a consistent number of dimensions.");
+        for (double value : row)
+            if (!std::isfinite(value))
+                throw std::invalid_argument("DTW inputs must contain only finite values.");
+    }
+    return dimensions;
+}
+inline void check_sequences(const Matrix& a, const Matrix& b, double p) {
+    check_p(p);
+    if (check_matrix(a) != check_matrix(b))
+        throw std::invalid_argument("a and b must have the same number of dimensions.");
+}
+// Called only after validation; avoid rechecking/copying coordinates at each cell.
+inline double point_distance(const std::vector<double>& a,
+                             const std::vector<double>& b, double p) {
+    double sum = 0.0;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        sum += std::pow(std::abs(a[i] - b[i]), p);
+    const double result = std::pow(sum, 1.0 / p);
+    if (!std::isfinite(result))
+        throw std::overflow_error("DTW point distance exceeds the finite numeric range.");
+    return result;
+}
+inline double finite_distance(double distance) {
+    if (!std::isfinite(distance))
+        throw std::overflow_error("DTW accumulated distance exceeds the finite numeric range.");
+    return distance;
+}
+} // namespace detail
+
+inline double p_norm(const std::vector<double>& a,
+                     const std::vector<double>& b, double p) {
+    detail::check_p(p);
+    if (a.size() != b.size())
+        throw std::invalid_argument("p_norm requires equal-length vectors.");
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (!std::isfinite(a[i]) || !std::isfinite(b[i]))
+            throw std::invalid_argument("p_norm inputs must contain only finite values.");
+    return detail::point_distance(a, b, p);
+}
+
+// Exact unrestricted DTW with the original unnormalised accumulated cost.
+// Two rows suffice when only the distance is requested; no full n-by-m matrix.
+inline double dtw_distance_only(const Matrix& a, const Matrix& b, double p) {
+    detail::check_sequences(a, b, p);
+    std::vector<double> previous(b.size(), 0.0), current(b.size(), 0.0);
+    previous[0] = detail::point_distance(a[0], b[0], p);
+    for (std::size_t j = 1; j < b.size(); ++j)
+        previous[j] = previous[j-1] + detail::point_distance(a[0], b[j], p);
+    for (std::size_t i = 1; i < a.size(); ++i) {
+        current[0] = previous[0] + detail::point_distance(a[i], b[0], p);
+        for (std::size_t j = 1; j < b.size(); ++j)
+            current[j] = detail::point_distance(a[i], b[j], p)
+                + std::min(std::min(previous[j], current[j-1]), previous[j-1]);
+        previous.swap(current);
+    }
+    return detail::finite_distance(previous.back());
+}
+
+// Assemble accumulated costs, including the origin cell c[0][0].
+inline Matrix dtw_vector_assemble(Matrix d, const Matrix& c) {
+    const std::size_t columns = detail::check_matrix(c);
+    if (d.size() != c.size())
+        throw std::invalid_argument("DTW cost and accumulated matrices must have the same shape.");
+    for (std::size_t i = 0; i < d.size(); ++i) {
+        if (d[i].size() != columns)
+            throw std::invalid_argument("DTW cost and accumulated matrices must have the same shape.");
+        for (double cost : c[i])
+            if (cost < 0.0)
+                throw std::invalid_argument("DTW point costs must be non-negative.");
+    }
+    d[0][0] = c[0][0];
+    for (std::size_t i = 1; i < d.size(); ++i)
+        d[i][0] = d[i-1][0] + c[i][0];
+    for (std::size_t j = 1; j < columns; ++j)
+        d[0][j] = d[0][j-1] + c[0][j];
+    for (std::size_t i = 1; i < d.size(); ++i)
+        for (std::size_t j = 1; j < columns; ++j)
+            d[i][j] = c[i][j] + std::min(std::min(d[i-1][j], d[i][j-1]), d[i-1][j-1]);
+    detail::finite_distance(d.back().back());
+    return d;
+}
+
+class DTW {
+public:
+    Matrix a_vector, b_vector;
+    int a_data = 0, n_dim = 0, b_data = 0;
+    double p = 2.0, distance = 0.0;
+    Matrix dtw_vector, pairwise_vector;
+
+    DTW(const Matrix& a, const Matrix& b, double norm_p)
+        : a_vector(a), b_vector(b), p(norm_p) {
+        detail::check_sequences(a_vector, b_vector, p);
+        const auto maximum = static_cast<std::size_t>(std::numeric_limits<int>::max());
+        if (a_vector.size() > maximum || b_vector.size() > maximum
+                || a_vector.front().size() > maximum)
+            throw std::length_error("DTW sequence dimensions exceed the integer path index range.");
+        a_data = static_cast<int>(a_vector.size());
+        b_data = static_cast<int>(b_vector.size());
+        n_dim = static_cast<int>(a_vector.front().size());
+        pairwise_vector.assign(a_vector.size(), std::vector<double>(b_vector.size(), 0.0));
+        for (std::size_t i = 0; i < a_vector.size(); ++i)
+            for (std::size_t j = 0; j < b_vector.size(); ++j)
+                pairwise_vector[i][j] = detail::point_distance(a_vector[i], b_vector[j], p);
+        dtw_vector = dtw_vector_assemble(
+            Matrix(a_vector.size(), std::vector<double>(b_vector.size(), 0.0)), pairwise_vector);
+        distance = dtw_vector.back().back();
+    }
+
+    std::vector<std::vector<int>> path() const {
+        // Public compatibility fields can be modified by callers; guard indexing.
+        if (a_data <= 0 || b_data <= 0 || dtw_vector.size() != static_cast<std::size_t>(a_data))
+            throw std::invalid_argument("Invalid DTW path matrix.");
+        for (const auto& row : dtw_vector)
+            if (row.size() != static_cast<std::size_t>(b_data))
+                throw std::invalid_argument("Invalid DTW path matrix.");
+        int i = a_data - 1, j = b_data - 1;
+        std::vector<std::vector<int>> result = {{i, j}};
+        while (i > 0 || j > 0) {
+            if (i == 0) --j;
+            else if (j == 0) --i;
+            else {
+                const double step = std::min(std::min(dtw_vector[i-1][j], dtw_vector[i][j-1]),
+                                             dtw_vector[i-1][j-1]);
+                // Preserve the original vertical, horizontal, diagonal tie order.
+                if (step == dtw_vector[i-1][j]) --i;
+                else if (step == dtw_vector[i][j-1]) --j;
+                else { --i; --j; }
+            }
+            result.push_back({i, j});
+        }
+        std::reverse(result.begin(), result.end());
+        return result;
+    }
+};
+} // namespace DTW
+#endif
